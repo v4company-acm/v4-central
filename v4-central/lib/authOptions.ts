@@ -13,7 +13,7 @@ const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
-        const users = readJSON('users.json')
+        const users = await readJSON('users')
         const user = users.find((u: any) => u.email === credentials.email)
         if (!user) return null
         const valid = await bcrypt.compare(credentials.password, user.password)
