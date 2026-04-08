@@ -9,12 +9,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!session) return res.status(401).json({ error: 'Não autorizado' })
 
   if (req.method === 'GET') {
-    const clients = readJSON('clients.json')
+    const clients = await readJSON('clients')
     return res.status(200).json(clients)
   }
 
   if (req.method === 'POST') {
-    const clients = readJSON('clients.json')
+    const clients = await readJSON('clients')
     const newClient = {
       id: uuidv4(),
       ...req.body,
@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metricas: {},
     }
     clients.push(newClient)
-    writeJSON('clients.json', clients)
+    await writeJSON('clients', clients)
     return res.status(201).json(newClient)
   }
 
