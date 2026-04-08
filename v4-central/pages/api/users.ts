@@ -11,22 +11,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isAdmin = (session.user as any).role === 'admin'
 
   if (req.method === 'GET') {
-    const users = readJSON('users.json').map((u: any) => ({
+    const users = await readJSON('users')
+    return res.status(200).json(users.map((u: any) => ({
       id: u.id, name: u.name, email: u.email, role: u.role
-    }))
-    return res.status(200).json(users)
+    })))
   }
 
   if (req.method === 'POST') {
     if (!isAdmin) return res.status(403).json({ error: 'Apenas admins podem criar usuários' })
     const { name, email, password, role } = req.body
-    const users = readJSON('users.json')
+    const users = await readJSON('users')
     if (users.find((u: any) => u.email === email))
       return res.status(400).json({ error: 'Email já cadastrado' })
     const hashed = await bcrypt.hash(password, 10)
     const newUser = { id: uuidv4(), name, email, password: hashed, role: role || 'member' }
     users.push(newUser)
-    writeJSON('users.json', users)
+    await writeJSON('users', users)
     const { password: _, ...safe } = newUser
     return res.status(201).json(safe)
   }
@@ -34,9 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'DELETE') {
     if (!isAdmin) return res.status(403).json({ error: 'Apenas admins podem remover usuários' })
     const { id } = req.body
-    const users = readJSON('users.json')
+    const users = await readJSON('users')
     const filtered = users.filter((u: any) => u.id !== id)
-    writeJSON('users.json', filtered)
+    await writeJSON('users', filtered)
     return res.status(200).json({ ok: true })
   }
 
