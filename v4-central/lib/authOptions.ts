@@ -1,6 +1,6 @@
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
-import { readJSON } from '../../lib/db'
+import { readJSON } from './db'
 import type { NextAuthOptions } from 'next-auth'
 
 const authOptions: NextAuthOptions = {
