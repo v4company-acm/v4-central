@@ -1,15 +1,14 @@
-import fs from 'fs'
-import path from 'path'
+import { kv } from '@vercel/kv'
 
-const dataDir = path.join(process.cwd(), 'data')
-
-export function readJSON(filename: string) {
-  const file = path.join(dataDir, filename)
-  if (!fs.existsSync(file)) return []
-  return JSON.parse(fs.readFileSync(file, 'utf-8'))
+export async function readJSON(key: string): Promise<any[]> {
+  try {
+    const data = await kv.get<any[]>(key)
+    return data || []
+  } catch {
+    return []
+  }
 }
 
-export function writeJSON(filename: string, data: any) {
-  const file = path.join(dataDir, filename)
-  fs.writeFileSync(file, JSON.stringify(data, null, 2))
+export async function writeJSON(key: string, data: any): Promise<void> {
+  await kv.set(key, data)
 }
