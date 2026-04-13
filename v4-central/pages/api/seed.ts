@@ -1,3 +1,4 @@
+import { NextApiRequest, NextApiResponse } from 'next'
 import { kv } from '@vercel/kv'
 import bcrypt from 'bcryptjs'
 
