@@ -1,6 +1,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import Image from 'next/image'
 
 interface Props { children: React.ReactNode; title?: string; topbarRight?: React.ReactNode }
 
@@ -13,17 +14,17 @@ export default function Layout({ children, title = 'Central de Clientes', topbar
     <div className="layout">
       <aside className="sidebar">
         <div className="logo">
-          <div className="logo-dot" />
-          V4 Company
+          <Image src="/logo.png" alt="V4 ACM&Co" width={36} height={36} style={{borderRadius:8,objectFit:'cover'}} />
+          <span style={{fontSize:13,fontWeight:700,letterSpacing:'-0.3px'}}>ACM&Co</span>
         </div>
 
         <div className="sb-section">Menu</div>
         <Link href="/" className={`sb-item ${router.pathname === '/' ? 'active' : ''}`}>
-          <span>👥</span> Clientes
+          <span style={{fontSize:14}}>👥</span> Clientes
         </Link>
         {isAdmin && (
           <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
-            <span>⚙️</span> Usuários
+            <span style={{fontSize:14}}>⚙️</span> Usuários
           </Link>
         )}
 
