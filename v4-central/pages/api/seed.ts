@@ -1,5 +1,3 @@
-Vou criar uma página de setup simples dentro do app. Acesse no GitHub o arquivo v4-central/pages/api/seed.ts, clique no lápis e substitua tudo por:
-typescriptimport { NextApiRequest, NextApiResponse } from 'next'
 import { kv } from '@vercel/kv'
 import bcrypt from 'bcryptjs'
 
