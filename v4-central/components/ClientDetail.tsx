@@ -1,3 +1,4 @@
+import MetricsDashboard from './MetricsDashboard'
 import { useState } from 'react'
 
 function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d.split('-');return`${day}/${m}/${y}`}catch{return d} }
