@@ -22,6 +22,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await kv.set(key, metrics)
     return res.status(200).json({ ok: true })
   }
-
   res.status(405).end()
 }
