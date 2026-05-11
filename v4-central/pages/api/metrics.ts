@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { clienteNome, metrica } = req.body
     const clients = await kv.get<any[]>('clients') || []
     const idx = clients.findIndex((c: any) => c.nome === clienteNome)
-    if (idx === -1) return res.status(404).json({ error: `Cliente "${clienteNome}" não encontrado` })
+    if (idx === -1) return res.status(200).json({ ok: false, error: `Cliente "${clienteNome}" não cadastrado no v4-central` }))
     const historico = Array.isArray(clients[idx].metricasHistorico) ? clients[idx].metricasHistorico : []
     const filtered = historico.filter((m: any) => m.data !== metrica.data)
     clients[idx].metricasHistorico = [metrica, ...filtered]
