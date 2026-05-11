@@ -176,7 +176,12 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                 </table>
               </div>
           }
-        </>}
+       {tab==='metricas' && (
+  <MetricsDashboard
+    historico={c.metricasHistorico || []}
+    clienteNome={c.nome}
+  />
+)}
 
         {tab==='otimizacoes' && <>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
