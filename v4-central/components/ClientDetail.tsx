@@ -109,25 +109,12 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
           }
         </>}
 
-        {tab==='metricas' && <>
-          {/* Cards de melhor resultado */}
-          {historico.length > 0 && <>
-            <div className="sec-title">Melhores resultados</div>
-            <div className="stat-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:16}}>
-              <div className="stat-box" style={{borderTop:'3px solid #D72B2B'}}>
-                <div className="stat-lbl">Melhor ROAS</div>
-                <div className="stat-val" style={{color:'#D72B2B'}}>{bestRoas ? bestRoas.toFixed(1)+'x' : '—'}</div>
-              </div>
-              <div className="stat-box" style={{borderTop:'3px solid #D72B2B'}}>
-                <div className="stat-lbl">Melhor ROI</div>
-                <div className="stat-val" style={{color:'#D72B2B'}}>{bestRoi ? bestRoi.toFixed(0)+'%' : '—'}</div>
-              </div>
-              <div className="stat-box" style={{borderTop:'3px solid #D72B2B'}}>
-                <div className="stat-lbl">Recorde de vendas</div>
-                <div className="stat-val" style={{color:'#D72B2B'}}>{bestVendas ? fmtNum(bestVendas) : '—'}</div>
-              </div>
-            </div>
-          </>}
+        {tab==='metricas' && (
+  <MetricsDashboard
+    historico={c.metricasHistorico || []}
+    clienteNome={c.nome}
+  />
+)}
 
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <div className="sec-title" style={{margin:0}}>Histórico de métricas ({historico.length} entradas)</div>
