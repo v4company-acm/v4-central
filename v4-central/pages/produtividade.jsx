@@ -941,19 +941,26 @@ export default function Produtividade() {
       <div style={{height:4,background:C.topbar}}/>
 
       {/* HEADER */}
-      <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"0 24px",
-        display:"flex",alignItems:"center",justifyContent:"space-between",height:54,
-        position:"sticky",top:4,zIndex:200,boxShadow:"0 1px 4px rgba(0,0,0,.07)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:34,height:34,background:C.red,borderRadius:8,display:"flex",
-            alignItems:"center",justifyContent:"center",color:"#fff",fontSize:13,fontWeight:900}}>V4</div>
-          <div>
-            <p style={{color:C.text3,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",margin:0}}>ACM&Co · Produtividade</p>
-            <p style={{color:C.text,fontSize:14,fontWeight:800,margin:0}}>
-              {NAV.find(n=>n.id===page)?.label}
-            </p>
-          </div>
-        </div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+  <a href="/" style={{
+    display:"flex",alignItems:"center",justifyContent:"center",
+    width:32,height:32,borderRadius:8,border:`1px solid ${C.border2}`,
+    background:C.bg,color:C.text2,fontSize:16,textDecoration:"none",
+    cursor:"pointer",transition:"all .15s",flexShrink:0
+  }}
+    onMouseEnter={e=>e.currentTarget.style.background=C.redLight}
+    onMouseLeave={e=>e.currentTarget.style.background=C.bg}>
+    ←
+  </a>
+  <div style={{width:34,height:34,background:C.red,borderRadius:8,display:"flex",
+    alignItems:"center",justifyContent:"center",color:"#fff",fontSize:13,fontWeight:900}}>V4</div>
+  <div>
+    <p style={{color:C.text3,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",margin:0}}>ACM&Co · Produtividade</p>
+    <p style={{color:C.text,fontSize:14,fontWeight:800,margin:0}}>
+      {NAV.find(n=>n.id===page)?.label}
+    </p>
+  </div>
+</div>
 
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {/* Filtros */}
