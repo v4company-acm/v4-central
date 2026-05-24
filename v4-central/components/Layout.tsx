@@ -20,12 +20,16 @@ export default function Layout({ children, title = 'Central de Clientes', topbar
 
         <div className="sb-section">Menu</div>
         <Link href="/" className={`sb-item ${router.pathname === '/' ? 'active' : ''}`}>
-          <span style={{fontSize:14}}>👥</span> Clientes
-        </Link>
-        {isAdmin && (
-          <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
-            <span style={{fontSize:14}}>⚙️</span> Usuários
-          </Link>
+  <span style={{fontSize:14}}>👥</span> Clientes
+</Link>
+<Link href="/produtividade" className={`sb-item ${router.pathname.startsWith('/produtividade') ? 'active' : ''}`}>
+  <span style={{fontSize:14}}>📊</span> Produtividade
+</Link>
+{isAdmin && (
+  <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
+    <span style={{fontSize:14}}>⚙️</span> Usuários
+  </Link>
+)}
         )}
 
         <div className="sb-footer">
