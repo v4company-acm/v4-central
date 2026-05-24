@@ -27,12 +27,10 @@ function badgeLbl(s: string) { return {ativo:'Ativo',atencao:'Em atenção',chur
 function fmtR(v: number) { return `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}` }
 
 const TOOLS = [
-  { label:'Ekyte',         icon:'🎯', href:'https://app.ekyte.com',                 color:C.blue,   bg:C.blueBg   },
-  { label:'Windsor.ai',    icon:'📊', href:'https://windsor.ai',                    color:'#7C3AED', bg:'#F5F3FF'  },
-  { label:'Google Ads',    icon:'🔍', href:'https://ads.google.com',                color:C.green,  bg:C.greenBg  },
-  { label:'Meta Ads',      icon:'📘', href:'https://business.facebook.com',         color:C.blue,   bg:C.blueBg   },
-  { label:'Analytics',     icon:'📈', href:'https://analytics.google.com',          color:C.amber,  bg:C.amberBg  },
-  { label:'Produtividade', icon:'⏱',  href:'/produtividade',                        color:C.red,    bg:C.redLight },
+  { label:'Ekyte',         icon:'🎯', href:'https://app.ekyte.com', color:C.blue,  bg:C.blueBg   },
+  { label:'Check-in PPT',  icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight  },
+  { label:'Candidatura',   icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg   },
+  { label:'Produtividade', icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg   },
 ]
 
 // ── Supabase helper ───────────────────────────────────────────────────────────
