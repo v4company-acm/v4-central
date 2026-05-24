@@ -527,7 +527,7 @@ export default function Produtividade() {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={tarefasPorFase} layout="vertical" barSize={13}>
                   <XAxis type="number" tick={{fill:C.text3,fontSize:9}} axisLine={false} tickLine={false}/>
-                  <YAxis dataKey="name" type="category" tick={{fill:C.text2,fontSize:10}} axisLine={false} tickLine={false} width:125
+                  <YAxis dataKey="name" type="category" tick={{fill:C.text2,fontSize:10}} axisLine={false} tickLine={false} width={125}
                     tickFormatter={n=>n.length>18?n.slice(0,18)+"…":n}/>
                   <Tooltip content={<Tip/>}/>
                   <Bar dataKey="value" name="Tarefas" radius={[0,4,4,0]}>
