@@ -21,6 +21,12 @@ export default function Layout({ children, title = 'Central de Clientes', topbar
         <Link href="/" className={`sb-item ${router.pathname === '/' ? 'active' : ''}`}>
           <span style={{fontSize:14}}>👥</span> Clientes
         </Link>
+        <Link href="/checkin" className={`sb-item ${router.pathname === '/checkin' ? 'active' : ''}`}>
+          <span style={{fontSize:14}}>📋</span> Check-in PPT
+        </Link>
+        <Link href="/candidatura" className={`sb-item ${router.pathname === '/candidatura' ? 'active' : ''}`}>
+          <span style={{fontSize:14}}>📝</span> Candidatura
+        </Link>
         <Link href="/produtividade" className={`sb-item ${router.pathname.startsWith('/produtividade') ? 'active' : ''}`}>
           <span style={{fontSize:14}}>📊</span> Produtividade
         </Link>
