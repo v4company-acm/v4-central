@@ -17,21 +17,18 @@ export default function Layout({ children, title = 'Central de Clientes', topbar
           <Image src="/logo.png" alt="V4 ACM&Co" width={36} height={36} style={{borderRadius:8,objectFit:'cover'}} />
           <span style={{fontSize:13,fontWeight:700,letterSpacing:'-0.3px'}}>ACM&Co</span>
         </div>
-
         <div className="sb-section">Menu</div>
         <Link href="/" className={`sb-item ${router.pathname === '/' ? 'active' : ''}`}>
-  <span style={{fontSize:14}}>👥</span> Clientes
-</Link>
-<Link href="/produtividade" className={`sb-item ${router.pathname.startsWith('/produtividade') ? 'active' : ''}`}>
-  <span style={{fontSize:14}}>📊</span> Produtividade
-</Link>
-{isAdmin && (
-  <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
-    <span style={{fontSize:14}}>⚙️</span> Usuários
-  </Link>
-)}
+          <span style={{fontSize:14}}>👥</span> Clientes
+        </Link>
+        <Link href="/produtividade" className={`sb-item ${router.pathname.startsWith('/produtividade') ? 'active' : ''}`}>
+          <span style={{fontSize:14}}>📊</span> Produtividade
+        </Link>
+        {isAdmin && (
+          <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
+            <span style={{fontSize:14}}>⚙️</span> Usuários
+          </Link>
         )}
-
         <div className="sb-footer">
           <div className="sb-user">
             <strong>{session?.user?.name}</strong>
@@ -42,7 +39,6 @@ export default function Layout({ children, title = 'Central de Clientes', topbar
           </button>
         </div>
       </aside>
-
       <div className="main">
         <div className="topbar">
           <h2 style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
