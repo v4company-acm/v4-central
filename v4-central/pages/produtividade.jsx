@@ -689,23 +689,60 @@ export default function Produtividade() {
         </Card>
 
         <Card>
-          <SecTitle sub="Distribuição por tipo">Composição</SecTitle>
-          <PieChart width={220} height={180} style={{margin:"0 auto"}}>
-            <Pie data={byType.filter(t=>t.v>0).map(t=>({name:t.name,value:t.v}))}
-              cx={110} cy={84} innerRadius={52} outerRadius={82}
-              dataKey="value" paddingAngle={4} strokeWidth={0}>
-              {byType.filter(t=>t.v>0).map((t,i)=><Cell key={i} fill={t.c}/>)}
-            </Pie>
-            <Tooltip content={<Tip/>} formatter={v=>fmtH(v)}/>
-          </PieChart>
-          <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginTop:8}}>
-            {byType.filter(t=>t.v>0).map((t,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
-                <div style={{width:10,height:10,borderRadius:3,background:t.c}}/>
-                <span style={{color:C.text2,fontSize:11}}>{t.name} · {fmtH(t.v)}</span>
-              </div>
-            ))}
-          </div>
+          <SecTitle sub="Status das tarefas do período">Composição de Tarefas</SecTitle>
+          {(()=>{
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+            const naoInic = T.filter(t=>t.situation===10&&!(t.actual_time>0));
+            const emAberto= T.filter(t=>t.situation===10&&t.actual_time>0);
+            const emAtraso= T.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
+            const conclui = T.filter(t=>t.situation===30);
+            const data=[
+              {name:"Não iniciadas",value:naoInic.length, c:C.text3},
+              {name:"Em aberto",    value:emAberto.length,c:C.blue},
+              {name:"Em atraso",    value:emAtraso.length,c:C.orange},
+              {name:"Concluídas",   value:conclui.length, c:C.green},
+            ].filter(x=>x.value>0);
+            return (
+              <>
+                <PieChart width={220} height={170} style={{margin:"0 auto"}}>
+                  <Pie data={data} cx={110} cy={80} innerRadius={50} outerRadius={78}
+                    dataKey="value" paddingAngle={3} strokeWidth={0}>
+                    {data.map((d,i)=><Cell key={i} fill={d.c}/>)}
+                  </Pie>
+                  <Tooltip content={<Tip/>}/>
+                </PieChart>
+                <div style={{marginTop:10}}>
+                  {data.map((d,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",
+                      alignItems:"center",padding:"6px 4px",borderBottom:`1px solid ${C.border}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:10,height:10,borderRadius:3,background:d.c,flexShrink:0}}/>
+                        <span style={{color:C.text2,fontSize:12}}>{d.name}</span>
+                      </div>
+                      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                        <span style={{color:C.text3,fontSize:10}}>{pct(d.value,T.length)}%</span>
+                        <span style={{color:d.c,fontSize:13,fontWeight:800,minWidth:28,textAlign:"right"}}>{d.value}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {emAtraso.length>0&&(
+                  <div style={{background:C.orangeBg,border:`1px solid ${C.orange}30`,borderRadius:8,
+                    padding:"10px 12px",marginTop:12,display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:14}}>⚠️</span>
+                    <div>
+                      <p style={{color:C.orange,fontSize:11,fontWeight:800,margin:0}}>
+                        {emAtraso.length} tarefa{emAtraso.length>1?"s":""} em atraso
+                      </p>
+                      <p style={{color:C.text3,fontSize:10,margin:"2px 0 0"}}>
+                        {pct(emAtraso.length,T.length)}% do total do período
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </Card>
       </div>
     </>
