@@ -6,7 +6,7 @@ import {
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://pqzojyhyqzizgudrdkhr.supabase.co";
-const SUPABASE_KEY = "SUA_ANON_KEY_AQUI"; // substitua pela anon key (pública)
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxem9qeWh5cXppemd1ZHJka2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE1ODYsImV4cCI6MjA5MjYwNzU4Nn0.dn4wXlLiPh7Nti0ybBbg1OApGlADK2agOEJsRbcAhwA"; // substitua pela anon key (pública)
 
 const query = async (table, select = "*", filters = "") => {
   const res = await fetch(
