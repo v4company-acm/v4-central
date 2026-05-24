@@ -28,7 +28,7 @@ function fmtR(v: number) { return `R$ ${v.toLocaleString('pt-BR',{minimumFractio
 
 const TOOLS = [
   { label:'Ekyte',         icon:'🎯', href:'https://app.ekyte.com',                 color:C.blue,   bg:C.blueBg   },
-  { label:'Windsor.ai',    icon:'📊', href:'https://windsor.ai',                    color:C.purple||'#7C3AED', bg:'#F5F3FF' },
+  { label:'Windsor.ai',    icon:'📊', href:'https://windsor.ai',                    color:'#7C3AED', bg:'#F5F3FF'  },
   { label:'Google Ads',    icon:'🔍', href:'https://ads.google.com',                color:C.green,  bg:C.greenBg  },
   { label:'Meta Ads',      icon:'📘', href:'https://business.facebook.com',         color:C.blue,   bg:C.blueBg   },
   { label:'Analytics',     icon:'📈', href:'https://analytics.google.com',          color:C.amber,  bg:C.amberBg  },
