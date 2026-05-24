@@ -216,25 +216,13 @@ const NAV = [
 ];
 
 // ── TABELA DE TAREFAS COM FILTROS INLINE ─────────────────────────────────────
-function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
+function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag,getPrazoStatus}) {
   const [fExec,setFExec] = useState([]);
   const [fWs,setFWs]     = useState([]);
   const [fSit,setFSit]   = useState([]);
   const [fPrazo,setFPrazo]= useState([]);
   const [busca,setBusca] = useState("");
   const [pgSize,setPgSize]= useState(30);
-
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const amanha = new Date(hoje); amanha.setDate(amanha.getDate()+1);
-
-  const getPrazoStatus = (due_date) => {
-    if(!due_date) return null;
-    const d = new Date(due_date); d.setHours(0,0,0,0);
-    if(d < hoje)  return {label:"Em atraso", color:C.red,    bg:"#FFF0F0", icon:"🔴"};
-    if(d.getTime()===hoje.getTime()) return {label:"Hoje",   color:C.amber, bg:C.amberBg, icon:"🟡"};
-    if(d < new Date(hoje.getTime()+7*864e5)) return {label:"Esta semana", color:C.green, bg:C.greenBg, icon:"🟢"};
-    return {label:"No prazo", color:C.text3, bg:C.bg, icon:"⚪"};
-  };
 
   const optsExec = useMemo(()=>[...new Set(tarefas.map(t=>t.executor).filter(Boolean))].sort(),[tarefas]);
   const optsWs   = useMemo(()=>[...new Set(tarefas.map(t=>t.workspace).filter(Boolean))].sort(),[tarefas]);
@@ -446,6 +434,7 @@ export default function Produtividade() {
   const [rawT,setRawT]   = useState([]);
   const [rawP,setRawP]   = useState([]);
   const [rawH,setRawH]   = useState([]);
+  const [rawTA,setRawTA] = useState([]); // todas tarefas ativas (para filtro de prazo)
   const [loading,setLoading]=useState(true);
   const [err,setErr]     = useState(null);
 
@@ -453,12 +442,14 @@ export default function Produtividade() {
     (async()=>{
       setLoading(true); setErr(null);
       try {
-        const [t,p,h]=await Promise.all([
+        const [t,p,h,ta]=await Promise.all([
           sb("ekyte_tarefas","*",`&creation_date=gte.${df}&creation_date=lte.${dt}T23:59:59`),
           sb("ekyte_projetos","*"),
           sb("ekyte_horas","*",`&date=gte.${df}&date=lte.${dt}`),
+          // Carrega TODAS as tarefas ativas para o filtro de prazo (independente do período)
+          sb("ekyte_tarefas","*","&situation=in.(10,20)&limit=2000"),
         ]);
-        setRawT(t||[]); setRawP(p||[]); setRawH(h||[]);
+        setRawT(t||[]); setRawP(p||[]); setRawH(h||[]); setRawTA(ta||[]);
       } catch(e){ setErr(e.message); }
       finally{ setLoading(false); }
     })();
@@ -479,9 +470,27 @@ export default function Produtividade() {
     return true;
   }),[rawT,xExec,xWs]);
 
-  const ap=i=>{setPreset(i);setCustom(false);setDf(PRESETS[i].f);setDt(PRESETS[i].t);};
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const amanha = new Date(hoje); amanha.setDate(amanha.getDate()+1);
 
-  // ── Cálculos globais ───────────────────────────────────────────────────────
+  // Parse de data sem conversão UTC (evita bug de timezone no Brasil UTC-3)
+  const parseLocalDate = (str) => {
+    if(!str) return null;
+    const s = str.split('T')[0];
+    const [y,m,d] = s.split('-').map(Number);
+    return new Date(y, m-1, d);
+  };
+
+  const getPrazoStatus = (due_date) => {
+    const d = parseLocalDate(due_date);
+    if(!d) return null;
+    if(d < hoje)                        return {label:"Em atraso",   color:C.red,   bg:"#FFF0F0"};
+    if(d.getTime()===hoje.getTime())    return {label:"Hoje",        color:C.amber, bg:C.amberBg};
+    if(d < new Date(hoje.getTime()+7*864e5)) return {label:"Esta semana", color:C.green, bg:C.greenBg};
+    return {label:"No prazo", color:C.text3, bg:C.bg};
+  };
+
+  const ap=i=>{setPreset(i);setCustom(false);setDf(PRESETS[i].f);setDt(PRESETS[i].t);};
   const totalMin    = useMemo(()=>H.reduce((s,h)=>s+(h.minutes||0),0),[H]);
   const custoReal   = useMemo(()=>H.reduce((s,h)=>s+(h.accomplished_rate||0),0),[H]);
   const concl       = useMemo(()=>T.filter(t=>t.situation===30).length,[T]);
@@ -908,7 +917,7 @@ export default function Produtividade() {
         </Card>
       </div>
 
-      <TabelaTarefas tarefas={T} SIT={SIT} fmtH={fmtH} C={C} Avatar={Avatar} Tag={Tag} />
+      <TabelaTarefas tarefas={rawTA} SIT={SIT} fmtH={fmtH} C={C} Avatar={Avatar} Tag={Tag} getPrazoStatus={getPrazoStatus}/>
     </>
   );
 
