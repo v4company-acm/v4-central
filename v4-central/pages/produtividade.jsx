@@ -215,6 +215,164 @@ const NAV = [
   {id:"clientes",icon:"$", label:"Clientes"},
 ];
 
+// ── TABELA DE TAREFAS COM FILTROS INLINE ─────────────────────────────────────
+function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
+  const [fExec,setFExec] = useState([]);
+  const [fWs,setFWs]     = useState([]);
+  const [fSit,setFSit]   = useState([]);
+  const [busca,setBusca] = useState("");
+  const [pgSize,setPgSize]= useState(30);
+
+  const optsExec = useMemo(()=>[...new Set(tarefas.map(t=>t.executor).filter(Boolean))].sort(),[tarefas]);
+  const optsWs   = useMemo(()=>[...new Set(tarefas.map(t=>t.workspace).filter(Boolean))].sort(),[tarefas]);
+  const optsSit  = useMemo(()=>[...new Set(tarefas.map(t=>SIT[t.situation]?.l).filter(Boolean))].sort(),[tarefas,SIT]);
+
+  const filtered = useMemo(()=>tarefas.filter(t=>{
+    if(fExec.length && !fExec.includes(t.executor)) return false;
+    if(fWs.length   && !fWs.includes(t.workspace))  return false;
+    if(fSit.length  && !fSit.includes(SIT[t.situation]?.l)) return false;
+    if(busca && !`${t.title} ${t.workspace} ${t.executor} ${t.phase}`.toLowerCase().includes(busca.toLowerCase())) return false;
+    return true;
+  }),[tarefas,fExec,fWs,fSit,busca]);
+
+  const hasFilter = fExec.length||fWs.length||fSit.length||busca;
+
+  return (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
+      overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
+
+      {/* Barra de filtros da tabela */}
+      <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,
+        display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",background:C.bg}}>
+
+        {/* Busca */}
+        <div style={{position:"relative",flex:1,minWidth:200}}>
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",
+            color:C.text3,fontSize:12}}>🔍</span>
+          <input
+            value={busca} onChange={e=>setBusca(e.target.value)}
+            placeholder="Buscar tarefa, workspace, executor..."
+            style={{width:"100%",background:C.card,border:`1px solid ${C.border2}`,color:C.text,
+              borderRadius:8,padding:"7px 12px 7px 30px",fontSize:12,boxSizing:"border-box"}}/>
+        </div>
+
+        {/* Filtro Executor */}
+        <MS label="Executor" opts={optsExec} val={fExec} set={setFExec}/>
+
+        {/* Filtro Workspace */}
+        <MS label="Workspace" opts={optsWs} val={fWs} set={setFWs}/>
+
+        {/* Filtro Situação — chips rápidos */}
+        <div style={{display:"flex",gap:4}}>
+          {optsSit.map(s=>{
+            const sitEntry=Object.values(SIT).find(v=>v.l===s);
+            const active=fSit.includes(s);
+            return (
+              <button key={s} onClick={()=>setFSit(p=>p.includes(s)?p.filter(x=>x!==s):[...p,s])} style={{
+                background:active?(sitEntry?.bg||`${sitEntry?.c}15`):"transparent",
+                color:active?(sitEntry?.c||C.red):C.text3,
+                border:`1px solid ${active?(sitEntry?.c||C.red):C.border2}`,
+                borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                transition:"all .15s"}}>
+                {s}
+              </button>
+            );
+          })}
+        </div>
+
+        {hasFilter&&(
+          <button onClick={()=>{setFExec([]);setFWs([]);setFSit([]);setBusca("");}} style={{
+            background:"transparent",color:C.text3,border:`1px solid ${C.border}`,
+            borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>
+            ✕ Limpar
+          </button>
+        )}
+
+        <span style={{color:C.text3,fontSize:11,marginLeft:"auto"}}>
+          {filtered.length} de {tarefas.length} tarefas
+        </span>
+      </div>
+
+      {/* Tabela */}
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+          <thead>
+            <tr style={{background:C.bg}}>
+              {["Tarefa","Workspace","Executor","Etapa","Situação","Prev.","Real"].map(h=>(
+                <th key={h} style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,
+                  textTransform:"uppercase",padding:"10px 14px",textAlign:"left",
+                  borderBottom:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.slice(0,pgSize).map((t,i)=>{
+              const sit=SIT[t.situation]||{l:"Outro",c:C.text3,bg:"#F5F5F5"};
+              const estourado=t.actual_time>t.estimated_time&&t.estimated_time>0;
+              return (
+                <tr key={i} style={{borderBottom:`1px solid ${C.border}`,transition:"background .1s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.redLight}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <td style={{padding:"10px 14px",maxWidth:260}}>
+                    <span style={{color:C.text,fontSize:12,fontWeight:600,overflow:"hidden",
+                      textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{t.title||"—"}</span>
+                  </td>
+                  <td style={{padding:"10px 14px",maxWidth:150}}>
+                    <span style={{color:C.text2,fontSize:11,overflow:"hidden",
+                      textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{t.workspace||"—"}</span>
+                  </td>
+                  <td style={{padding:"10px 14px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Avatar name={t.executor} size={22}/>
+                      <span style={{color:C.text2,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",
+                        textOverflow:"ellipsis",maxWidth:120}}>{t.executor||"—"}</span>
+                    </div>
+                  </td>
+                  <td style={{padding:"10px 14px",color:C.text2,fontSize:11,maxWidth:160}}>
+                    <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>
+                      {t.phase||"—"}
+                    </span>
+                  </td>
+                  <td style={{padding:"10px 14px"}}>
+                    <Tag label={sit.l} color={sit.c} bg={sit.bg}/>
+                  </td>
+                  <td style={{padding:"10px 14px",color:C.text2,fontSize:11,fontFamily:"monospace",whiteSpace:"nowrap"}}>
+                    {fmtH(t.estimated_time)}
+                  </td>
+                  <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,whiteSpace:"nowrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{color:estourado?C.orange:C.text2,fontWeight:estourado?700:400}}>
+                        {fmtH(t.actual_time)}
+                      </span>
+                      {estourado&&<span style={{fontSize:9,color:C.orange,fontWeight:800}}>▲</span>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {filtered.length===0&&(
+          <div style={{padding:"40px 0",textAlign:"center",color:C.text3,fontSize:13}}>
+            Nenhuma tarefa encontrada com os filtros selecionados
+          </div>
+        )}
+
+        {filtered.length>pgSize&&(
+          <div style={{padding:"14px",textAlign:"center",borderTop:`1px solid ${C.border}`}}>
+            <button onClick={()=>setPgSize(p=>p+30)} style={{
+              background:C.redLight,color:C.red,border:`1px solid ${C.redMid}`,
+              borderRadius:8,padding:"8px 20px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              Carregar mais ({filtered.length-pgSize} restantes)
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function Produtividade() {
   const [page,setPage]   = useState("geral");
@@ -599,56 +757,7 @@ export default function Produtividade() {
         </Card>
       </div>
 
-      <Card style={{padding:0,overflow:"hidden"}}>
-        <div style={{padding:"18px 22px 14px"}}><SecTitle>Detalhamento de Tarefas</SecTitle></div>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
-            <thead>
-              <tr style={{background:C.bg}}>
-                {["Tarefa","Workspace","Executor","Etapa","Situação","Tempo Prev.","Tempo Real"].map(h=>(
-                  <th key={h} style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,
-                    textTransform:"uppercase",padding:"10px 16px",textAlign:"left",
-                    borderBottom:`1px solid ${C.border}`}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {T.slice(0,30).map((t,i)=>{
-                const sit=SIT[t.situation]||{l:"Outro",c:C.text3,bg:"#F5F5F5"};
-                return (
-                  <tr key={i} style={{borderBottom:`1px solid ${C.border}`,transition:"background .1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.redLight}
-                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <td style={{padding:"10px 16px",color:C.text,fontSize:12,maxWidth:240}}>
-                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{t.title||"—"}</span>
-                    </td>
-                    <td style={{padding:"10px 16px",color:C.text2,fontSize:11,maxWidth:140}}>
-                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{t.workspace||"—"}</span>
-                    </td>
-                    <td style={{padding:"10px 16px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <Avatar name={t.executor} size={22}/>
-                        <span style={{color:C.text2,fontSize:11}}>{t.executor?.split(" ")[0]||"—"}</span>
-                      </div>
-                    </td>
-                    <td style={{padding:"10px 16px",color:C.text2,fontSize:11}}>{t.phase||"—"}</td>
-                    <td style={{padding:"10px 16px"}}><Tag label={sit.l} color={sit.c} bg={sit.bg}/></td>
-                    <td style={{padding:"10px 16px",color:C.text2,fontSize:11,fontFamily:"monospace"}}>{fmtH(t.estimated_time)}</td>
-                    <td style={{padding:"10px 16px",fontSize:11,fontFamily:"monospace"}}>
-                      <span style={{color:t.actual_time>t.estimated_time&&t.estimated_time?C.orange:C.text2}}>
-                        {fmtH(t.actual_time)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {T.length>30&&<p style={{color:C.text3,fontSize:11,textAlign:"center",padding:"12px 0"}}>
-            Mostrando 30 de {T.length} tarefas
-          </p>}
-        </div>
-      </Card>
+      <TabelaTarefas tarefas={T} SIT={SIT} fmtH={fmtH} C={C} Avatar={Avatar} Tag={Tag} />
     </>
   );
 
