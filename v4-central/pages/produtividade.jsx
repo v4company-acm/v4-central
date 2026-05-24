@@ -220,68 +220,115 @@ function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
   const [fExec,setFExec] = useState([]);
   const [fWs,setFWs]     = useState([]);
   const [fSit,setFSit]   = useState([]);
+  const [fPrazo,setFPrazo]= useState([]);
   const [busca,setBusca] = useState("");
   const [pgSize,setPgSize]= useState(30);
+
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const amanha = new Date(hoje); amanha.setDate(amanha.getDate()+1);
+
+  const getPrazoStatus = (due_date) => {
+    if(!due_date) return null;
+    const d = new Date(due_date); d.setHours(0,0,0,0);
+    if(d < hoje)  return {label:"Em atraso", color:C.red,    bg:"#FFF0F0", icon:"🔴"};
+    if(d.getTime()===hoje.getTime()) return {label:"Hoje",   color:C.amber, bg:C.amberBg, icon:"🟡"};
+    if(d < new Date(hoje.getTime()+7*864e5)) return {label:"Esta semana", color:C.green, bg:C.greenBg, icon:"🟢"};
+    return {label:"No prazo", color:C.text3, bg:C.bg, icon:"⚪"};
+  };
 
   const optsExec = useMemo(()=>[...new Set(tarefas.map(t=>t.executor).filter(Boolean))].sort(),[tarefas]);
   const optsWs   = useMemo(()=>[...new Set(tarefas.map(t=>t.workspace).filter(Boolean))].sort(),[tarefas]);
   const optsSit  = useMemo(()=>[...new Set(tarefas.map(t=>SIT[t.situation]?.l).filter(Boolean))].sort(),[tarefas,SIT]);
+  const PRAZO_OPTS = ["Em atraso","Hoje","Esta semana","No prazo"];
 
   const filtered = useMemo(()=>tarefas.filter(t=>{
     if(fExec.length && !fExec.includes(t.executor)) return false;
     if(fWs.length   && !fWs.includes(t.workspace))  return false;
     if(fSit.length  && !fSit.includes(SIT[t.situation]?.l)) return false;
+    if(fPrazo.length){
+      const ps = getPrazoStatus(t.due_date);
+      if(!ps || !fPrazo.includes(ps.label)) return false;
+    }
     if(busca && !`${t.title} ${t.workspace} ${t.executor} ${t.phase}`.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
-  }),[tarefas,fExec,fWs,fSit,busca]);
+  }),[tarefas,fExec,fWs,fSit,fPrazo,busca]);
 
-  const hasFilter = fExec.length||fWs.length||fSit.length||busca;
+  const hasFilter = fExec.length||fWs.length||fSit.length||fPrazo.length||busca;
+
+  // Contadores por prazo para os chips
+  const prazoCount = useMemo(()=>{
+    const acc={};
+    tarefas.forEach(t=>{
+      const ps=getPrazoStatus(t.due_date);
+      if(ps) acc[ps.label]=(acc[ps.label]||0)+1;
+    });
+    return acc;
+  },[tarefas]);
 
   return (
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
       overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
 
-      {/* Barra de filtros da tabela */}
+      {/* Barra de filtros */}
       <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,
         display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",background:C.bg}}>
 
-        {/* Busca */}
         <div style={{position:"relative",flex:1,minWidth:200}}>
           <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",
             color:C.text3,fontSize:12}}>🔍</span>
-          <input
-            value={busca} onChange={e=>setBusca(e.target.value)}
+          <input value={busca} onChange={e=>setBusca(e.target.value)}
             placeholder="Buscar tarefa, workspace, executor..."
             style={{width:"100%",background:C.card,border:`1px solid ${C.border2}`,color:C.text,
               borderRadius:8,padding:"7px 12px 7px 30px",fontSize:12,boxSizing:"border-box"}}/>
         </div>
 
-        {/* Filtro Executor */}
-        <MS label="Executor" opts={optsExec} val={fExec} set={setFExec}/>
+        <MS label="Executor"  opts={optsExec} val={fExec} set={setFExec}/>
+        <MS label="Workspace" opts={optsWs}   val={fWs}   set={setFWs}/>
 
-        {/* Filtro Workspace */}
-        <MS label="Workspace" opts={optsWs} val={fWs} set={setFWs}/>
-
-        {/* Filtro Situação — chips rápidos */}
+        {/* Chips de Situação */}
         <div style={{display:"flex",gap:4}}>
           {optsSit.map(s=>{
-            const sitEntry=Object.values(SIT).find(v=>v.l===s);
+            const se=Object.values(SIT).find(v=>v.l===s);
             const active=fSit.includes(s);
             return (
               <button key={s} onClick={()=>setFSit(p=>p.includes(s)?p.filter(x=>x!==s):[...p,s])} style={{
-                background:active?(sitEntry?.bg||`${sitEntry?.c}15`):"transparent",
-                color:active?(sitEntry?.c||C.red):C.text3,
-                border:`1px solid ${active?(sitEntry?.c||C.red):C.border2}`,
-                borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
-                transition:"all .15s"}}>
+                background:active?(se?.bg||`${se?.c}15`):"transparent",
+                color:active?(se?.c||C.red):C.text3,
+                border:`1px solid ${active?(se?.c||C.red):C.border2}`,
+                borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                 {s}
               </button>
             );
           })}
         </div>
 
+        <div style={{width:1,height:22,background:C.border2}}/>
+
+        {/* Chips de Prazo */}
+        <div style={{display:"flex",gap:4}}>
+          {PRAZO_OPTS.map(p=>{
+            const colors={"Em atraso":{c:C.red,bg:"#FFF0F0"},"Hoje":{c:C.amber,bg:C.amberBg},"Esta semana":{c:C.green,bg:C.greenBg},"No prazo":{c:C.text3,bg:C.bg}};
+            const col=colors[p];
+            const active=fPrazo.includes(p);
+            const count=prazoCount[p]||0;
+            if(!count&&!active) return null;
+            return (
+              <button key={p} onClick={()=>setFPrazo(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])} style={{
+                background:active?col.bg:"transparent",
+                color:active?col.c:C.text3,
+                border:`1px solid ${active?col.c:C.border2}`,
+                borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",
+                display:"flex",alignItems:"center",gap:4}}>
+                {p}
+                <span style={{background:active?col.c:C.border2,color:active?"#fff":C.text3,
+                  borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:900}}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {hasFilter&&(
-          <button onClick={()=>{setFExec([]);setFWs([]);setFSit([]);setBusca("");}} style={{
+          <button onClick={()=>{setFExec([]);setFWs([]);setFSit([]);setFPrazo([]);setBusca("");}} style={{
             background:"transparent",color:C.text3,border:`1px solid ${C.border}`,
             borderRadius:7,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>
             ✕ Limpar
@@ -295,10 +342,10 @@ function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
 
       {/* Tabela */}
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:800}}>
           <thead>
             <tr style={{background:C.bg}}>
-              {["Tarefa","Workspace","Executor","Etapa","Situação","Prev.","Real"].map(h=>(
+              {["Tarefa","Workspace","Executor","Etapa","Situação","Prazo","Prev.","Real"].map(h=>(
                 <th key={h} style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,
                   textTransform:"uppercase",padding:"10px 14px",textAlign:"left",
                   borderBottom:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>{h}</th>
@@ -309,6 +356,7 @@ function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
             {filtered.slice(0,pgSize).map((t,i)=>{
               const sit=SIT[t.situation]||{l:"Outro",c:C.text3,bg:"#F5F5F5"};
               const estourado=t.actual_time>t.estimated_time&&t.estimated_time>0;
+              const ps=getPrazoStatus(t.due_date);
               return (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border}`,transition:"background .1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background=C.redLight}
@@ -324,11 +372,11 @@ function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
                   <td style={{padding:"10px 14px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <Avatar name={t.executor} size={22}/>
-                      <span style={{color:C.text2,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",
-                        textOverflow:"ellipsis",maxWidth:120}}>{t.executor||"—"}</span>
+                      <span style={{color:C.text2,fontSize:11,overflow:"hidden",
+                        textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{t.executor||"—"}</span>
                     </div>
                   </td>
-                  <td style={{padding:"10px 14px",color:C.text2,fontSize:11,maxWidth:160}}>
+                  <td style={{padding:"10px 14px",color:C.text2,fontSize:11,maxWidth:140}}>
                     <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>
                       {t.phase||"—"}
                     </span>
@@ -336,11 +384,24 @@ function TabelaTarefas({tarefas,SIT,fmtH,C,Avatar,Tag}) {
                   <td style={{padding:"10px 14px"}}>
                     <Tag label={sit.l} color={sit.c} bg={sit.bg}/>
                   </td>
+                  <td style={{padding:"10px 14px"}}>
+                    {ps ? (
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:ps.color,flexShrink:0}}/>
+                        <div>
+                          <p style={{color:ps.color,fontSize:11,fontWeight:700,margin:0,whiteSpace:"nowrap"}}>
+                            {t.due_date?.split("T")[0]||"—"}
+                          </p>
+                          <p style={{color:ps.color,fontSize:9,margin:0,opacity:.8}}>{ps.label}</p>
+                        </div>
+                      </div>
+                    ) : <span style={{color:C.text3,fontSize:11}}>—</span>}
+                  </td>
                   <td style={{padding:"10px 14px",color:C.text2,fontSize:11,fontFamily:"monospace",whiteSpace:"nowrap"}}>
                     {fmtH(t.estimated_time)}
                   </td>
                   <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,whiteSpace:"nowrap"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
                       <span style={{color:estourado?C.orange:C.text2,fontWeight:estourado?700:400}}>
                         {fmtH(t.actual_time)}
                       </span>
