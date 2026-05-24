@@ -511,23 +511,32 @@ export default function Produtividade() {
   const totalCusto=custoTab.reduce((s,c)=>s+c.custo,0);
 
   // ── SEÇÕES ────────────────────────────────────────────────────────────────
-  const renderGeral = () => (
+  const renderGeral = () => {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const naoInic  = T.filter(t=>t.situation===10&&!(t.actual_time>0));
+    const emAberto = T.filter(t=>t.situation===10&&t.actual_time>0);
+    const emAtraso = T.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
+    const hNaoInic = H.filter(h=>tMap[h.task_id]?.situation===10&&!(tMap[h.task_id]?.actual_time>0)).reduce((s,h)=>s+(h.minutes||0),0);
+    const hAberto  = H.filter(h=>tMap[h.task_id]?.situation===10&&tMap[h.task_id]?.actual_time>0).reduce((s,h)=>s+(h.minutes||0),0);
+
+    return (
     <>
-      {/* KPIs topo */}
+      {/* KPIs topo — rings */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
-        <KpiRing label="Horas Totais"    value={fmtH(totalMin)}      sub={`${mediaDia}h/dia · ${dias} dias`} color={C.red}   icon="⏱"/>
-        <KpiRing label="Taxa Conclusão"  value={`${taxaConcl}%`}     sub={`${concl} de ${T.length} tarefas`} color={taxaConcl>60?C.green:C.orange} pctVal={taxaConcl}/>
-        <KpiRing label="Eficiência"      value={`${efic}%`}          sub="do tempo em tarefas concluídas"    color={efic>50?C.green:C.amber} pctVal={efic}/>
+        <KpiRing label="Horas Totais"   value={fmtH(totalMin)}  sub={`${mediaDia}h/dia · ${dias} dias`} color={C.red}  icon="⏱"/>
+        <KpiRing label="Taxa Conclusão" value={`${taxaConcl}%`} sub={`${concl} de ${T.length} tarefas`} color={taxaConcl>60?C.green:C.orange} pctVal={taxaConcl}/>
+        <KpiRing label="Eficiência"     value={`${efic}%`}      sub="do tempo em tarefas concluídas"    color={efic>50?C.green:C.amber} pctVal={efic}/>
       </div>
 
+      {/* KPIs secundários — foco em abertas e atraso */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
-        <Kpi label="Custo Realizado" value={fmtK(custoReal)}       sub="pelo Ekyte"              color={C.amber}/>
-        <Kpi label="Tarefas Ativas"  value={ativas}                sub={`${concl} concluídas`}   color={C.blue}/>
-        <Kpi label="Projetos Ativos" value={projAtivos}            sub={`${rawP.length} total`}  color={C.purple}/>
-        <Kpi label="Membros Ativos"  value={hByExec.length}        sub="com horas no período"    color={C.cyan}/>
+        <Kpi label="Custo Realizado"   value={fmtK(custoReal)}  sub="pelo Ekyte"                     color={C.amber}/>
+        <Kpi label="Tarefas em Aberto" value={emAberto.length}  sub={`${fmtH(hAberto)} apontadas`}   color={C.blue}/>
+        <Kpi label="Tarefas em Atraso" value={emAtraso.length}  sub={`${pct(emAtraso.length,T.length)}% do total`} color={emAtraso.length>0?C.orange:C.green}/>
+        <Kpi label="Não Iniciadas"     value={naoInic.length}   sub="sem nenhum apontamento"          color={C.text3}/>
       </div>
 
-      {/* Tendência + Breakdown */}
+      {/* Tendência + Painel de status */}
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:16}}>
         <Card>
           <SecTitle sub="Horas confirmadas por dia">Evolução Diária</SecTitle>
@@ -551,28 +560,59 @@ export default function Produtividade() {
           </ResponsiveContainer>
         </Card>
 
-        <Card>
-          <SecTitle sub="Tarefas vs Tickets vs Avulso">Tipo de Apontamento</SecTitle>
-          <div style={{marginBottom:16}}>
-            {byType.map((t,i)=>(
-              <div key={i} style={{marginBottom:14}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{width:8,height:8,borderRadius:2,background:t.c}}/>
-                    <span style={{color:C.text2,fontSize:12}}>{t.name}</span>
-                  </div>
-                  <span style={{color:C.text,fontSize:12,fontWeight:700}}>{fmtH(t.v)}</span>
-                </div>
-                <Bar2 value={t.v} max={totalMin} color={t.c}/>
+        <Card style={{display:"flex",flexDirection:"column",gap:12}}>
+          <SecTitle sub="Situação das tarefas do período">Status da Equipe</SecTitle>
+
+          {/* Não iniciadas */}
+          <div style={{background:C.bg,borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <div style={{width:8,height:8,borderRadius:2,background:C.text3}}/>
+                <span style={{color:C.text2,fontSize:12,fontWeight:600}}>Não iniciadas</span>
               </div>
-            ))}
+              <span style={{color:C.text,fontSize:16,fontWeight:900}}>{naoInic.length}</span>
+            </div>
+            <Bar2 value={naoInic.length} max={T.length} color={C.text3} height={5}/>
+            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{pct(naoInic.length,T.length)}% das tarefas sem apontamento</p>
           </div>
-          <div style={{background:C.bg,borderRadius:8,padding:"12px 14px"}}>
-            <p style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 6px"}}>
-              Horas em tarefas concluídas
+
+          {/* Em aberto */}
+          <div style={{background:C.blueBg,borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <div style={{width:8,height:8,borderRadius:2,background:C.blue}}/>
+                <span style={{color:C.blue,fontSize:12,fontWeight:700}}>Em aberto</span>
+              </div>
+              <span style={{color:C.text,fontSize:16,fontWeight:900}}>{emAberto.length}</span>
+            </div>
+            <Bar2 value={emAberto.length} max={T.length} color={C.blue} height={5}/>
+            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{fmtH(hAberto)} apontadas nessas tarefas</p>
+          </div>
+
+          {/* Em atraso */}
+          <div style={{background:emAtraso.length>0?C.orangeBg:C.greenBg,borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <span style={{fontSize:12}}>{emAtraso.length>0?"⚠️":"✅"}</span>
+                <span style={{color:emAtraso.length>0?C.orange:C.green,fontSize:12,fontWeight:700}}>
+                  {emAtraso.length>0?"Em atraso":"Sem atrasos"}
+                </span>
+              </div>
+              <span style={{color:C.text,fontSize:16,fontWeight:900}}>{emAtraso.length}</span>
+            </div>
+            {emAtraso.length>0&&<Bar2 value={emAtraso.length} max={T.length} color={C.orange} height={5}/>}
+            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>
+              {emAtraso.length>0?`${pct(emAtraso.length,T.length)}% das tarefas com prazo vencido`:"Todas as tarefas dentro do prazo"}
+            </p>
+          </div>
+
+          {/* Horas em concluídas */}
+          <div style={{background:C.greenBg,borderRadius:10,padding:"12px 14px"}}>
+            <p style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 4px"}}>
+              Horas em concluídas
             </p>
             <p style={{color:C.green,fontSize:20,fontWeight:900,margin:0}}>{fmtH(horasConcl)}</p>
-            <p style={{color:C.text3,fontSize:11,margin:"3px 0 0"}}>{efic}% do total</p>
+            <p style={{color:C.text3,fontSize:10,margin:"3px 0 0"}}>{efic}% do total apontado</p>
           </div>
         </Card>
       </div>
@@ -620,7 +660,8 @@ export default function Produtividade() {
         </Card>
       </div>
     </>
-  );
+    );
+  };
 
   const renderHoras = () => (
     <>
