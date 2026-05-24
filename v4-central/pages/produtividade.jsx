@@ -431,8 +431,20 @@ export default function Produtividade() {
   const mediaDia    = (totalMin/60/dias).toFixed(1);
 
   const tMap=useMemo(()=>{const m={};rawT.forEach(t=>{m[t.ekyte_id]=t;});return m;},[rawT]);
+
+  // Tarefas que tiveram apontamento no período (independente de situação)
+  const taskIdsComHoras = useMemo(()=>new Set(H.map(h=>h.task_id).filter(Boolean)),[H]);
+
+  // Cobertura = % das tarefas ativas que tiveram apontamento no período
+  const tarefasAtivas   = useMemo(()=>rawT.filter(t=>t.situation===10||t.situation===20),[rawT]);
+  const tarefasCom      = useMemo(()=>tarefasAtivas.filter(t=>taskIdsComHoras.has(t.ekyte_id)).length,[tarefasAtivas,taskIdsComHoras]);
+  const cobertura       = pct(tarefasCom, tarefasAtivas.length);
+
+  // Horas em tarefas concluídas (situation=30) — pode ser 0 para recorrentes
   const horasConcl  = useMemo(()=>H.filter(h=>tMap[h.task_id]?.situation===30).reduce((s,h)=>s+(h.minutes||0),0),[H,tMap]);
-  const efic        = pct(horasConcl,totalMin);
+  // Eficiência = horas em tarefas que tiveram apontamento (executadas) / total
+  const horasExec   = useMemo(()=>H.filter(h=>taskIdsComHoras.has(h.task_id)).reduce((s,h)=>s+(h.minutes||0),0),[H,taskIdsComHoras]);
+  const efic        = pct(horasExec, totalMin);
 
   // Horas por workspace
   const hwsMap=useMemo(()=>H.reduce((a,h)=>{
@@ -523,9 +535,9 @@ export default function Produtividade() {
     <>
       {/* KPIs topo — rings */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
-        <KpiRing label="Horas Totais"   value={fmtH(totalMin)}  sub={`${mediaDia}h/dia · ${dias} dias`} color={C.red}  icon="⏱"/>
-        <KpiRing label="Taxa Conclusão" value={`${taxaConcl}%`} sub={`${concl} de ${T.length} tarefas`} color={taxaConcl>60?C.green:C.orange} pctVal={taxaConcl}/>
-        <KpiRing label="Eficiência"     value={`${efic}%`}      sub="do tempo em tarefas concluídas"    color={efic>50?C.green:C.amber} pctVal={efic}/>
+        <KpiRing label="Horas Totais"   value={fmtH(totalMin)}  sub={`${mediaDia}h/dia · ${dias} dias`}           color={C.red}  icon="⏱"/>
+        <KpiRing label="Cobertura"      value={`${cobertura}%`} sub={`${tarefasCom} de ${tarefasAtivas.length} tarefas executadas`} color={cobertura>60?C.green:C.orange} pctVal={cobertura}/>
+        <KpiRing label="Horas Executadas" value={`${efic}%`}    sub="das horas em tarefas com apontamento"         color={efic>80?C.green:C.amber} pctVal={efic}/>
       </div>
 
       {/* KPIs secundários — foco em abertas e atraso */}
@@ -586,7 +598,7 @@ export default function Produtividade() {
               <span style={{color:C.text,fontSize:16,fontWeight:900}}>{emAberto.length}</span>
             </div>
             <Bar2 value={emAberto.length} max={T.length} color={C.blue} height={5}/>
-            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{fmtH(hAberto)} apontadas nessas tarefas</p>
+            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{fmtH(horasExec)} apontadas nessas tarefas</p>
           </div>
 
           {/* Em atraso */}
@@ -606,13 +618,13 @@ export default function Produtividade() {
             </p>
           </div>
 
-          {/* Horas em concluídas */}
+          {/* Horas executadas */}
           <div style={{background:C.greenBg,borderRadius:10,padding:"12px 14px"}}>
             <p style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 4px"}}>
-              Horas em concluídas
+              Horas executadas
             </p>
-            <p style={{color:C.green,fontSize:20,fontWeight:900,margin:0}}>{fmtH(horasConcl)}</p>
-            <p style={{color:C.text3,fontSize:10,margin:"3px 0 0"}}>{efic}% do total apontado</p>
+            <p style={{color:C.green,fontSize:20,fontWeight:900,margin:0}}>{fmtH(horasExec)}</p>
+            <p style={{color:C.text3,fontSize:10,margin:"3px 0 0"}}>{efic}% do total · {tarefasCom} tarefas</p>
           </div>
         </Card>
       </div>
