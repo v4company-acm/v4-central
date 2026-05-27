@@ -10,8 +10,13 @@ export async function readJSON(key: string): Promise<any[]> {
     const { data } = await supabase.from('users').select('*')
     return data || []
   }
+  if (key === 'clients') {
+    const { data } = await supabase.from('clients').select('*')
+    return data || []
+  }
   return []
 }
+
 export async function writeJSON(key: string, data: any): Promise<void> {
   // implementar conforme necessidade
 }
