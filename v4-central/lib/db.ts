@@ -1,14 +1,18 @@
-import { kv } from '@vercel/kv'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function readJSON(key: string): Promise<any[]> {
-  try {
-    const data = await kv.get<any[]>(key)
+  if (key === 'users') {
+    const { data } = await supabase.from('users').select('*')
     return data || []
-  } catch {
-    return []
   }
+  return []
 }
 
 export async function writeJSON(key: string, data: any): Promise<void> {
-  await kv.set(key, data)
+  // implementar conforme necessidade
 }
