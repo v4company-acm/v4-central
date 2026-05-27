@@ -7,7 +7,7 @@ import {
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pqzojyhyqzizgudrdkhr.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxem9qeWh5cXppemd1ZHJka2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE1ODYsImV4cCI6MjA5MjYwNzU4Nn0.dn4wXlLiPh7Nti0ybBbg1OApGlADK2agOEJsRbcAhwA";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxem9qeWh5cXppemd1ZHJka2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE1ODYsImV4cCI6MjA5MjYwNzU4Nn0.dn4wXlLiPh7Nti0ybBbg1OApGlADK2agOEJsRbcAhwAv";
 const sb = async (table, select="*", qs="") => {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?select=${select}${qs}&limit=3000`,
     { headers:{ apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` } });
@@ -432,9 +432,9 @@ export default function Produtividade() {
   const [xExec,setXExec] = useState([]);
   const [xWs,setXWs]     = useState([]);
   const [rawT,setRawT]   = useState([]);
+  const [rawTA,setRawTA] = useState([]); // todas tarefas ativas (para painel atraso e tabela)
   const [rawP,setRawP]   = useState([]);
   const [rawH,setRawH]   = useState([]);
-  const [rawTA,setRawTA] = useState([]); // todas tarefas ativas (para filtro de prazo)
   const [taxaPadrao,setTaxaPadrao] = useState(25); // taxa padrão para Marina e Ana até definir
 
   // ── Mapa de taxa por executor ─────────────────────────────────────────────
@@ -455,11 +455,13 @@ export default function Produtividade() {
       setLoading(true); setErr(null);
       try {
         const [t,p,h,ta]=await Promise.all([
-          sb("ekyte_tarefas","*",`&creation_date=gte.${df}&creation_date=lte.${dt}T23:59:59`),
+          // Tarefas do período: filtradas pelo prazo de execução (due_date)
+          sb("ekyte_tarefas","*",`&due_date=gte.${df}&due_date=lte.${dt}&situation=in.(10,20,30,40)&limit=3000`),
           sb("ekyte_projetos","*"),
+          // Horas do período: filtradas pela data do apontamento
           sb("ekyte_horas","*",`&date=gte.${df}&date=lte.${dt}`),
-          // Carrega TODAS as tarefas ativas para o filtro de prazo (independente do período)
-          sb("ekyte_tarefas","*","&situation=in.(10,20)&limit=2000"),
+          // Todas as tarefas ativas: para painel de atraso e tabela de prazo
+          sb("ekyte_tarefas","*","&situation=in.(10,20)&limit=3000"),
         ]);
         setRawT(t||[]); setRawP(p||[]); setRawH(h||[]); setRawTA(ta||[]);
       } catch(e){ setErr(e.message); }
@@ -607,9 +609,9 @@ export default function Produtividade() {
   // ── SEÇÕES ────────────────────────────────────────────────────────────────
   const renderGeral = () => {
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const naoInic  = T.filter(t=>t.situation===10&&!(t.actual_time>0));
-    const emAberto = T.filter(t=>t.situation===10&&t.actual_time>0);
-    const emAtraso = T.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
+    const naoInic  = rawTA.filter(t=>t.situation===10&&!(t.actual_time>0));
+    const emAberto = rawTA.filter(t=>t.situation===10&&t.actual_time>0);
+    const emAtraso = rawTA.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
     const hNaoInic = H.filter(h=>tMap[h.task_id]?.situation===10&&!(tMap[h.task_id]?.actual_time>0)).reduce((s,h)=>s+(h.minutes||0),0);
     const hAberto  = H.filter(h=>tMap[h.task_id]?.situation===10&&tMap[h.task_id]?.actual_time>0).reduce((s,h)=>s+(h.minutes||0),0);
 
@@ -827,9 +829,9 @@ export default function Produtividade() {
           <SecTitle sub="Status das tarefas do período">Composição de Tarefas</SecTitle>
           {(()=>{
             const hoje = new Date(); hoje.setHours(0,0,0,0);
-            const naoInic = T.filter(t=>t.situation===10&&!(t.actual_time>0));
-            const emAberto= T.filter(t=>t.situation===10&&t.actual_time>0);
-            const emAtraso= T.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
+            const naoInic = rawTA.filter(t=>t.situation===10&&!(t.actual_time>0));
+            const emAberto= rawTA.filter(t=>t.situation===10&&t.actual_time>0);
+            const emAtraso= rawTA.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
             const conclui = T.filter(t=>t.situation===30);
             const data=[
               {name:"Não iniciadas",value:naoInic.length, c:C.text3},
