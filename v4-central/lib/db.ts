@@ -12,7 +12,6 @@ export async function readJSON(key: string): Promise<any[]> {
   }
   return []
 }
-
 export async function writeJSON(key: string, data: any): Promise<void> {
   // implementar conforme necessidade
 }
