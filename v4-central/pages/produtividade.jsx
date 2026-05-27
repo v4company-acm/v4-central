@@ -7,7 +7,7 @@ import {
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pqzojyhyqzizgudrdkhr.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxem9qeWh5cXppemd1ZHJka2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE1ODYsImV4cCI6MjA5MjYwNzU4Nn0.dn4wXlLiPh7Nti0ybBbg1OApGlADK2agOEJsRbcAhwAv";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxem9qeWh5cXppemd1ZHJka2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzE1ODYsImV4cCI6MjA5MjYwNzU4Nn0.dn4wXlLiPh7Nti0ybBbg1OApGlADK2agOEJsRbcAhwA";
 const sb = async (table, select="*", qs="") => {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?select=${select}${qs}&limit=3000`,
     { headers:{ apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}` } });
@@ -609,8 +609,8 @@ export default function Produtividade() {
   // ── SEÇÕES ────────────────────────────────────────────────────────────────
   const renderGeral = () => {
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const naoInic  = rawTA.filter(t=>t.situation===10&&!(t.actual_time>0));
-    const emAberto = rawTA.filter(t=>t.situation===10&&t.actual_time>0);
+    const naoInic  = T.filter(t=>t.situation===10&&!(t.actual_time>0));
+    const emAberto = T.filter(t=>t.situation===10&&t.actual_time>0);
     const emAtraso = rawTA.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
     const hNaoInic = H.filter(h=>tMap[h.task_id]?.situation===10&&!(tMap[h.task_id]?.actual_time>0)).reduce((s,h)=>s+(h.minutes||0),0);
     const hAberto  = H.filter(h=>tMap[h.task_id]?.situation===10&&tMap[h.task_id]?.actual_time>0).reduce((s,h)=>s+(h.minutes||0),0);
@@ -628,7 +628,7 @@ export default function Produtividade() {
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
         <Kpi label="Custo Realizado"   value={fmtK(custoReal)}  sub="custo por taxa/função"        color={C.amber}/>
         <Kpi label="Tarefas em Aberto" value={emAberto.length}  sub={`${fmtH(hAberto)} apontadas`}   color={C.blue}/>
-        <Kpi label="Tarefas em Atraso" value={emAtraso.length}  sub={`${pct(emAtraso.length,T.length)}% do total`} color={emAtraso.length>0?C.orange:C.green}/>
+        <Kpi label="Tarefas em Atraso" value={emAtraso.length}  sub={`${emAtraso.length} de ${rawTA.length} ativas`} color={emAtraso.length>0?C.orange:C.green}/>
         <Kpi label="Não Iniciadas"     value={naoInic.length}   sub="sem nenhum apontamento"          color={C.text3}/>
       </div>
 
@@ -669,7 +669,7 @@ export default function Produtividade() {
               <span style={{color:C.text,fontSize:16,fontWeight:900}}>{naoInic.length}</span>
             </div>
             <Bar2 value={naoInic.length} max={T.length} color={C.text3} height={5}/>
-            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{pct(naoInic.length,T.length)}% das tarefas sem apontamento</p>
+            <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>{pct(naoInic.length,T.length)}% das tarefas do período sem apontamento</p>
           </div>
 
           {/* Em aberto */}
@@ -696,9 +696,9 @@ export default function Produtividade() {
               </div>
               <span style={{color:C.text,fontSize:16,fontWeight:900}}>{emAtraso.length}</span>
             </div>
-            {emAtraso.length>0&&<Bar2 value={emAtraso.length} max={T.length} color={C.orange} height={5}/>}
+            {emAtraso.length>0&&<Bar2 value={emAtraso.length} max={rawTA.length} color={C.orange} height={5}/>}
             <p style={{color:C.text3,fontSize:10,margin:"4px 0 0"}}>
-              {emAtraso.length>0?`${pct(emAtraso.length,T.length)}% das tarefas com prazo vencido`:"Todas as tarefas dentro do prazo"}
+              {emAtraso.length>0?`${pct(emAtraso.length,rawTA.length)}% das tarefas ativas com prazo vencido`:"Todas as tarefas dentro do prazo"}
             </p>
           </div>
 
@@ -829,8 +829,8 @@ export default function Produtividade() {
           <SecTitle sub="Status das tarefas do período">Composição de Tarefas</SecTitle>
           {(()=>{
             const hoje = new Date(); hoje.setHours(0,0,0,0);
-            const naoInic = rawTA.filter(t=>t.situation===10&&!(t.actual_time>0));
-            const emAberto= rawTA.filter(t=>t.situation===10&&t.actual_time>0);
+            const naoInic = T.filter(t=>t.situation===10&&!(t.actual_time>0));
+            const emAberto= T.filter(t=>t.situation===10&&t.actual_time>0);
             const emAtraso= rawTA.filter(t=>t.situation!==30&&t.situation!==40&&t.due_date&&new Date(t.due_date)<hoje);
             const conclui = T.filter(t=>t.situation===30);
             const data=[
