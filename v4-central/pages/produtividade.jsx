@@ -435,6 +435,18 @@ export default function Produtividade() {
   const [rawP,setRawP]   = useState([]);
   const [rawH,setRawH]   = useState([]);
   const [rawTA,setRawTA] = useState([]); // todas tarefas ativas (para filtro de prazo)
+  const [taxaPadrao,setTaxaPadrao] = useState(25); // taxa padrão para Marina e Ana até definir
+
+  // ── Mapa de taxa por executor ─────────────────────────────────────────────
+  const TAXA_EXEC = useMemo(()=>({
+    "vitor.nunes@v4company.com":    22, // GT
+    "laura.almeida@v4company.com":  38, // Coordenadora
+    "alex.telles@v4company.com":    20, // Designer
+    "Gabriel Martins":              25, // Account
+    "marina.miranda@v4company.com": taxaPadrao, // Dona — atualizar quando definir
+    "anacarolyna.da@v4company.com": taxaPadrao, // People — atualizar quando definir
+  }),[taxaPadrao]);
+  const getTaxa = (exec) => TAXA_EXEC[exec] ?? taxaPadrao;
   const [loading,setLoading]=useState(true);
   const [err,setErr]     = useState(null);
 
@@ -492,7 +504,7 @@ export default function Produtividade() {
 
   const ap=i=>{setPreset(i);setCustom(false);setDf(PRESETS[i].f);setDt(PRESETS[i].t);};
   const totalMin    = useMemo(()=>H.reduce((s,h)=>s+(h.minutes||0),0),[H]);
-  const custoReal   = useMemo(()=>H.reduce((s,h)=>s+(h.accomplished_rate||0),0),[H]);
+  const custoReal   = useMemo(()=>H.reduce((s,h)=>s+((h.minutes||0)/60)*getTaxa(h.executor),0),[H,TAXA_EXEC]);
   const concl       = useMemo(()=>T.filter(t=>t.situation===30).length,[T]);
   const ativas      = useMemo(()=>T.filter(t=>t.situation===10).length,[T]);
   const taxaConcl   = pct(concl,T.length);
@@ -520,10 +532,10 @@ export default function Produtividade() {
   const hwsMap=useMemo(()=>H.reduce((a,h)=>{
     const k=h.workspace||"Sem cliente";
     if(!a[k]) a[k]={min:0,custo:0,exec:new Set()};
-    a[k].min+=(h.minutes||0); a[k].custo+=(h.accomplished_rate||0);
+    a[k].min+=(h.minutes||0); a[k].custo+=((h.minutes||0)/60)*getTaxa(h.executor);
     if(h.executor) a[k].exec.add(h.executor);
     return a;
-  },{}),[H]);
+  },{}),[H,TAXA_EXEC]);
 
   const hByWs=useMemo(()=>
     Object.entries(hwsMap).map(([name,v])=>({
@@ -536,7 +548,7 @@ export default function Produtividade() {
     Object.entries(H.reduce((a,h)=>{
       const k=h.executor||"?";
       if(!a[k]) a[k]={min:0,custo:0,task:0,ticket:0,av:0};
-      a[k].min+=(h.minutes||0); a[k].custo+=(h.accomplished_rate||0);
+      a[k].min+=(h.minutes||0); a[k].custo+=((h.minutes||0)/60)*getTaxa(k);
       if(h.entry_type==="task") a[k].task+=(h.minutes||0);
       else if(h.entry_type==="ticket") a[k].ticket+=(h.minutes||0);
       else a[k].av+=(h.minutes||0);
@@ -612,7 +624,7 @@ export default function Produtividade() {
 
       {/* KPIs secundários — foco em abertas e atraso */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
-        <Kpi label="Custo Realizado"   value={fmtK(custoReal)}  sub="pelo Ekyte"                     color={C.amber}/>
+        <Kpi label="Custo Realizado"   value={fmtK(custoReal)}  sub="custo por taxa/função"        color={C.amber}/>
         <Kpi label="Tarefas em Aberto" value={emAberto.length}  sub={`${fmtH(hAberto)} apontadas`}   color={C.blue}/>
         <Kpi label="Tarefas em Atraso" value={emAtraso.length}  sub={`${pct(emAtraso.length,T.length)}% do total`} color={emAtraso.length>0?C.orange:C.green}/>
         <Kpi label="Não Iniciadas"     value={naoInic.length}   sub="sem nenhum apontamento"          color={C.text3}/>
@@ -749,7 +761,7 @@ export default function Produtividade() {
     <>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
         <Kpi label="Total Horas"       value={fmtH(totalMin)}    sub={`${mediaDia}h/dia`}         color={C.red}/>
-        <Kpi label="Custo Realizado"   value={fmtR(custoReal)}   sub="via Ekyte"                  color={C.amber}/>
+        <Kpi label="Custo Realizado"   value={fmtR(custoReal)}   sub="custo por taxa/função"     color={C.amber}/>
         <Kpi label="Em Tarefas"        value={fmtH(byType[0]?.v)} sub="horas produtivas"          color={C.blue}/>
         <Kpi label="Eficiência"        value={`${efic}%`}         sub="horas em entregas concl."  color={efic>50?C.green:C.orange}/>
       </div>
@@ -938,7 +950,7 @@ export default function Produtividade() {
               <Avatar name={m.name} size={36}/>
               <div>
                 <p style={{color:C.text,fontSize:13,fontWeight:700,margin:0}}>{m.name}</p>
-                <p style={{color:C.text3,fontSize:10,margin:"2px 0 0"}}>{m.horas}h totais</p>
+                <p style={{color:C.text3,fontSize:10,margin:"2px 0 0"}}>{m.horas}h · R$ {getTaxa(m.name)}/h</p>
               </div>
             </div>
             <div>
@@ -980,7 +992,7 @@ export default function Produtividade() {
     <>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
         <Kpi label="Clientes Atendidos" value={hByWs.length}     sub="com horas no período"  color={C.red}/>
-        <Kpi label="Custo Total"        value={fmtR(custoReal)}  sub="realizado via Ekyte"   color={C.amber}/>
+        <Kpi label="Custo Total"        value={fmtR(custoReal)}  sub="custo por taxa/função" color={C.amber}/>
         <Kpi label="Média por Cliente"  value={hByWs.length?fmtK(custoReal/hByWs.length):"-"} sub="custo médio" color={C.blue}/>
       </div>
 
@@ -1133,6 +1145,15 @@ export default function Produtividade() {
               borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer"}}>✕</button>:null}
 
           <div style={{width:1,height:22,background:C.border2,margin:"0 4px"}}/>
+
+          {/* Taxa padrão (Marina + Ana) */}
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{color:C.text3,fontSize:10,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Padrão R$/h</span>
+            <input type="number" value={taxaPadrao} onChange={e=>setTaxaPadrao(+e.target.value||0)}
+              style={{background:C.bg,border:`1px solid ${C.border2}`,color:C.red,
+                borderRadius:7,padding:"4px 8px",fontSize:12,fontWeight:800,width:68,
+                textAlign:"center",outline:"none"}}/>
+          </div>
 
           {/* Período */}
           <div style={{display:"flex",gap:3,background:C.bg,borderRadius:8,padding:3}}>
