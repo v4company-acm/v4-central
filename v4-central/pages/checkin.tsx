@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
 import Head from 'next/head'
@@ -58,6 +58,9 @@ export default function CheckinPage() {
   const [loading,  setLoading]  = useState(false)
   const [feedback, setFeedback] = useState<{type:'success'|'error'; msg:string}|null>(null)
 
+  // 🔴 TRAVA ANTIDUPLICAÇÃO SÍNCRONA
+  const isSubmitting = useRef(false);
+
   useEffect(() => { loadClients(); loadHistory() }, [])
   useEffect(() => {
     const t = setInterval(loadHistory, 15000)
@@ -96,14 +99,18 @@ export default function CheckinPage() {
   }
 
   async function handleSubmit() {
-    // 🔴 TRAVA DEFINITIVA: Se o React já estiver processando um clique, ele ignora o segundo
-    if (loading) return;
-
+    // 🔴 1. VERIFICA A TRAVA NO NANOSSEGUNDO DO CLIQUE
+    if (isSubmitting.current) return;
+    
+    // Ativa o bloqueio imediatamente de forma síncrona
+    isSubmitting.current = true;
     setFeedback(null)
-    if (!clientId) return setFeedback({type:'error', msg:'Selecione um cliente.'})
-    if (!start||!end) return setFeedback({type:'error', msg:'Informe o período.'})
-    if (start>end) return setFeedback({type:'error', msg:'Data de início não pode ser maior que a final.'})
-    if (!email) return setFeedback({type:'error', msg:'Informe seu e-mail.'})
+
+    // Validações básicas (Liberam a trava caso falhem)
+    if (!clientId) { isSubmitting.current = false; return setFeedback({type:'error', msg:'Selecione um cliente.'}) }
+    if (!start||!end) { isSubmitting.current = false; return setFeedback({type:'error', msg:'Informe o período.'}) }
+    if (start>end) { isSubmitting.current = false; return setFeedback({type:'error', msg:'Data de início não pode ser maior que a final.'}) }
+    if (!email) { isSubmitting.current = false; return setFeedback({type:'error', msg:'Informe seu e-mail.'}) }
 
     setLoading(true)
     try {
@@ -128,7 +135,11 @@ export default function CheckinPage() {
       loadHistory()
     } catch(e:any) {
       setFeedback({type:'error', msg: e.message||'Erro inesperado. Tente novamente.'})
-    } finally { setLoading(false) }
+    } finally { 
+      // 🔴 2. DESBLOQUEIA A TRAVA SOMENTE APÓS CONCLUIR TODAS AS REQUISIÇÕES
+      isSubmitting.current = false;
+      setLoading(false) 
+    }
   }
 
   return (
