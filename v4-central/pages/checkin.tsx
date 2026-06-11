@@ -96,6 +96,9 @@ export default function CheckinPage() {
   }
 
   async function handleSubmit() {
+    // 🔴 TRAVA DEFINITIVA: Se o React já estiver processando um clique, ele ignora o segundo
+    if (loading) return;
+
     setFeedback(null)
     if (!clientId) return setFeedback({type:'error', msg:'Selecione um cliente.'})
     if (!start||!end) return setFeedback({type:'error', msg:'Informe o período.'})
