@@ -2,13 +2,14 @@ import MetricsDashboard from './MetricsDashboard'
 import { useState } from 'react'
 
 function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d.split('-');return`${day}/${m}/${y}`}catch{return d} }
-function fmtR(v: any) { if(!v&&v!==0) return '—'; return 'R$'+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}) }
+function fmtR(v: any) { if(!v&&v!==0) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) }
 function fmtNum(v: any) { if(!v&&v!==0) return '—'; return Number(v).toLocaleString('pt-BR') }
 
 const TABS = [
   {k:'dados',l:'Dados'},{k:'equipe',l:'Equipe'},{k:'links',l:'Links'},
   {k:'metricas',l:'Métricas'},{k:'otimizacoes',l:'Otimizações'},
-  {k:'reunioes',l:'Reuniões'},{k:'anotacoes',l:'Anotações'},{k:'criativos',l:'Criativos'}
+  {k:'reunioes',l:'Reuniões'},{k:'anotacoes',l:'Anotações'},{k:'criativos',l:'Criativos'},
+  {k:'monetizacoes',l:'Monetizações'} // 🔴 NOVA ABA ADICIONADA AQUI
 ]
 
 interface Props { client: any; onUpdate: (c: any) => void }
@@ -42,7 +43,6 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
     if (!mfields.data) return alert('Informe a data.')
     const novaMetrica = { ...mfields, savedAt: new Date().toISOString() }
     const novo = [novaMetrica, ...historico]
-    // Atualiza também o resumo rápido com a entrada mais recente
     onUpdate({ ...c, metricasHistorico: novo, metricas: mfields })
     setMetForm(false)
     setMfields({roas:'',cpl:'',leads:'',invest:'',roi:'',vendas:'',totalVendido:'',data:new Date().toISOString().slice(0,10)})
@@ -110,78 +110,73 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
         </>}
 
         {tab==='metricas' && (
-  <MetricsDashboard
-    historico={c.metricasHistorico || []}
-    clienteNome={c.nome}
-  />
-)}
-
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>Histórico de métricas ({historico.length} entradas)</div>
-            {!metForm && <button className="btn btn-sm btn-primary" onClick={()=>setMetForm(true)}>+ Nova entrada</button>}
-          </div>
-
-          {metForm && (
-            <div style={{background:'#fafafa',border:'1px solid #eee',borderRadius:10,padding:16,marginBottom:16}}>
-              <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>Nova entrada de métricas</div>
-              <div className="form-grid-4" style={{marginBottom:8}}>
-                <div className="field"><label>Data *</label><input type="date" value={mfields.data} onChange={e=>setMfields((p:any)=>({...p,data:e.target.value}))} /></div>
-                <div className="field"><label>ROAS</label><input value={mfields.roas} onChange={e=>setMfields((p:any)=>({...p,roas:e.target.value}))} placeholder="Ex: 4.8x" /></div>
-                <div className="field"><label>ROI (%)</label><input type="number" value={mfields.roi} onChange={e=>setMfields((p:any)=>({...p,roi:e.target.value}))} placeholder="Ex: 320" /></div>
-                <div className="field"><label>CPL (R$)</label><input type="number" value={mfields.cpl} onChange={e=>setMfields((p:any)=>({...p,cpl:e.target.value}))} /></div>
-              </div>
-              <div className="form-grid-4" style={{marginBottom:12}}>
-                <div className="field"><label>Leads gerados</label><input type="number" value={mfields.leads} onChange={e=>setMfields((p:any)=>({...p,leads:e.target.value}))} /></div>
-                <div className="field"><label>Qtd. de vendas</label><input type="number" value={mfields.vendas} onChange={e=>setMfields((p:any)=>({...p,vendas:e.target.value}))} /></div>
-                <div className="field"><label>Total vendido (R$)</label><input type="number" value={mfields.totalVendido} onChange={e=>setMfields((p:any)=>({...p,totalVendido:e.target.value}))} /></div>
-                <div className="field"><label>Investimento (R$)</label><input type="number" value={mfields.invest} onChange={e=>setMfields((p:any)=>({...p,invest:e.target.value}))} /></div>
-              </div>
-              <div style={{display:'flex',gap:8}}>
-                <button className="btn btn-sm" onClick={()=>setMetForm(false)}>Cancelar</button>
-                <button className="btn btn-primary btn-sm" onClick={salvarMetrica}>Salvar entrada</button>
-              </div>
+          <>
+            <MetricsDashboard
+              historico={c.metricasHistorico || []}
+              clienteNome={c.nome}
+            />
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <div className="sec-title" style={{margin:0}}>Histórico de métricas ({historico.length} entradas)</div>
+              {!metForm && <button className="btn btn-sm btn-primary" onClick={()=>setMetForm(true)}>+ Nova entrada</button>}
             </div>
-          )}
 
-          {historico.length === 0
-            ? <div className="empty">Nenhuma métrica registrada ainda.<br/>Clique em "+ Nova entrada" para começar.</div>
-            : <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead>
-                    <tr style={{borderBottom:'1px solid #eee'}}>
-                      {['Data','ROAS','ROI','CPL','Leads','Vendas','Total vendido','Investimento'].map(h=>(
-                        <th key={h} style={{textAlign:'left',padding:'8px 10px',fontSize:11,fontWeight:700,color:'#6B6B6B',textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>{h}</th>
-                      ))}
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historico.map((m:any,i:number)=>{
-                      const isTop = parseFloat(m.roas||0) === bestRoas && bestRoas && bestRoas > 0
-                      return (
-                        <tr key={i} style={{borderBottom:'1px solid #f5f5f5',background:isTop?'#fff8f8':'transparent'}}>
-                          <td style={{padding:'9px 10px',fontWeight:500,whiteSpace:'nowrap'}}>{fmtDate(m.data)} {isTop && <span style={{background:'#D72B2B',color:'#fff',fontSize:10,padding:'1px 6px',borderRadius:10,marginLeft:4}}>★</span>}</td>
-                          <td style={{padding:'9px 10px'}}>{m.roas||'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.roi?m.roi+'%':'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.cpl?'R$'+m.cpl:'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.leads?fmtNum(m.leads):'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.vendas?fmtNum(m.vendas):'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.totalVendido?fmtR(m.totalVendido):'—'}</td>
-                          <td style={{padding:'9px 10px'}}>{m.invest?fmtR(m.invest):'—'}</td>
-                          <td style={{padding:'9px 10px'}}><button className="btn btn-sm btn-danger" onClick={()=>{if(!confirm('Remover esta entrada?'))return;const arr=[...historico];arr.splice(i,1);onUpdate({...c,metricasHistorico:arr,metricas:arr[0]||{}})}}>×</button></td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+            {metForm && (
+              <div style={{background:'#fafafa',border:'1px solid #eee',borderRadius:10,padding:16,marginBottom:16}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>Nova entrada de métricas</div>
+                <div className="form-grid-4" style={{marginBottom:8}}>
+                  <div className="field"><label>Data *</label><input type="date" value={mfields.data} onChange={e=>setMfields((p:any)=>({...p,data:e.target.value}))} /></div>
+                  <div className="field"><label>ROAS</label><input value={mfields.roas} onChange={e=>setMfields((p:any)=>({...p,roas:e.target.value}))} placeholder="Ex: 4.8x" /></div>
+                  <div className="field"><label>ROI (%)</label><input type="number" value={mfields.roi} onChange={e=>setMfields((p:any)=>({...p,roi:e.target.value}))} placeholder="Ex: 320" /></div>
+                  <div className="field"><label>CPL (R$)</label><input type="number" value={mfields.cpl} onChange={e=>setMfields((p:any)=>({...p,cpl:e.target.value}))} /></div>
+                </div>
+                <div className="form-grid-4" style={{marginBottom:12}}>
+                  <div className="field"><label>Leads gerados</label><input type="number" value={mfields.leads} onChange={e=>setMfields((p:any)=>({...p,leads:e.target.value}))} /></div>
+                  <div className="field"><label>Qtd. de vendas</label><input type="number" value={mfields.vendas} onChange={e=>setMfields((p:any)=>({...p,vendas:e.target.value}))} /></div>
+                  <div className="field"><label>Total vendido (R$)</label><input type="number" value={mfields.totalVendido} onChange={e=>setMfields((p:any)=>({...p,totalVendido:e.target.value}))} /></div>
+                  <div className="field"><label>Investimento (R$)</label><input type="number" value={mfields.invest} onChange={e=>setMfields((p:any)=>({...p,invest:e.target.value}))} /></div>
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button className="btn btn-sm" onClick={()=>setMetForm(false)}>Cancelar</button>
+                  <button className="btn btn-primary btn-sm" onClick={salvarMetrica}>Salvar entrada</button>
+                </div>
               </div>
-          }
-       {tab==='metricas' && (
-  <MetricsDashboard
-    historico={c.metricasHistorico || []}
-    clienteNome={c.nome}
-  />
-)}
+            )}
+
+            {historico.length === 0
+              ? <div className="empty">Nenhuma métrica registrada ainda.<br/>Clique em "+ Nova entrada" para começar.</div>
+              : <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                    <thead>
+                      <tr style={{borderBottom:'1px solid #eee'}}>
+                        {['Data','ROAS','ROI','CPL','Leads','Vendas','Total vendido','Investimento'].map(h=>(
+                          <th key={h} style={{textAlign:'left',padding:'8px 10px',fontSize:11,fontWeight:700,color:'#6B6B6B',textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>{h}</th>
+                        ))}
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historico.map((m:any,i:number)=>{
+                        const isTop = parseFloat(m.roas||0) === bestRoas && bestRoas && bestRoas > 0
+                        return (
+                          <tr key={i} style={{borderBottom:'1px solid #f5f5f5',background:isTop?'#fff8f8':'transparent'}}>
+                            <td style={{padding:'9px 10px',fontWeight:500,whiteSpace:'nowrap'}}>{fmtDate(m.data)} {isTop && <span style={{background:'#D72B2B',color:'#fff',fontSize:10,padding:'1px 6px',borderRadius:10,marginLeft:4}}>★</span>}</td>
+                            <td style={{padding:'9px 10px'}}>{m.roas||'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.roi?m.roi+'%':'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.cpl?'R$'+m.cpl:'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.leads?fmtNum(m.leads):'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.vendas?fmtNum(m.vendas):'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.totalVendido?fmtR(m.totalVendido):'—'}</td>
+                            <td style={{padding:'9px 10px'}}>{m.invest?fmtR(m.invest):'—'}</td>
+                            <td style={{padding:'9px 10px'}}><button className="btn btn-sm btn-danger" onClick={()=>{if(!confirm('Remover esta entrada?'))return;const arr=[...historico];arr.splice(i,1);onUpdate({...c,metricasHistorico:arr,metricas:arr[0]||{}})}}>×</button></td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+            }
+          </>
+        )}
 
         {tab==='otimizacoes' && <>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
@@ -272,13 +267,47 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
               </div>
           }
         </>}
+
+        {/* 🔴 NOVA ABA DE MONETIZAÇÕES */}
+        {tab==='monetizacoes' && <>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <div className="sec-title" style={{margin:0}}>Histórico de Monetizações Extras</div>
+            <button className="btn btn-sm" onClick={()=>{setIfields({descricao:'',valor:'',data:new Date().toISOString().slice(0,10),status:'pago'});setItemForm('monetizacao')}}>+ Adicionar</button>
+          </div>
+          
+          <div style={{marginBottom:16, padding:'14px 16px', background:'#EFF6FF', borderRadius:10, border:'1px solid #BFDBFE', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontSize:14, fontWeight:700, color:'#1E3A8A', letterSpacing:0.5}}>TOTAL MONETIZADO</span>
+            <span style={{fontSize:18, fontWeight:900, color:'#1E3A8A'}}>{fmtR((c.monetizacoes||[]).reduce((sum:number,m:any)=>sum+Number(m.valor||0),0))}</span>
+          </div>
+
+          {(c.monetizacoes||[]).length===0?<div className="empty">Nenhuma monetização registrada ainda.</div>:
+            (c.monetizacoes||[]).map((m:any,i:number)=>(
+              <div key={i} className="item-row" style={{borderLeft: `4px solid ${m.status==='pago'?'#16A34A':'#EA580C'}`, paddingLeft:12}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <div className="item-title" style={{fontSize:14}}>{m.descricao}</div>
+                  <button className="btn btn-sm btn-danger" onClick={()=>removeItem('monetizacoes',i)}>×</button>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', marginTop:6, alignItems:'center'}}>
+                  <div className="item-meta">
+                    {m.data&&fmtDate(m.data)} <span style={{margin:'0 6px'}}>·</span> 
+                    <span style={{color:m.status==='pago'?'#16A34A':'#EA580C', fontWeight:700, fontSize:11, textTransform:'uppercase'}}>
+                      {m.status==='pago'?'Pago':'Pendente'}
+                    </span>
+                  </div>
+                  <div style={{fontWeight:800, color:'#111', fontSize:14}}>{fmtR(m.valor)}</div>
+                </div>
+              </div>
+            ))
+          }
+        </>}
       </div>
 
       {itemForm && (
         <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setItemForm(null)}}>
           <div className="modal modal-sm">
             <div className="modal-header">
-              <h3>{{otimizacao:'Nova otimização',reuniao:'Nova reunião',anotacao:'Nova anotação',arquivo:'Novo link',criativo:'Novo criativo'}[itemForm]}</h3>
+              {/* 🔴 ADICIONADO TÍTULO DO MODAL DE MONETIZAÇÃO */}
+              <h3>{{otimizacao:'Nova otimização',reuniao:'Nova reunião',anotacao:'Nova anotação',arquivo:'Novo link',criativo:'Novo criativo',monetizacao:'Nova monetização'}[itemForm as string]}</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>setItemForm(null)}>✕</button>
             </div>
             <div className="modal-body">
@@ -308,6 +337,20 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                 <div className="field"><label>Link (Drive, Pinterest, Behance...)</label><input value={ifields.url||''} onChange={e=>setIfields((p:any)=>({...p,url:e.target.value}))} placeholder="https://..." /></div>
                 <div className="field"><label>Descrição / observações</label><textarea value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} placeholder="Ex: Referência de cor, estilo, formato..." /></div>
               </>}
+
+              {/* 🔴 ADICIONADO CORPO DO MODAL DE MONETIZAÇÃO */}
+              {itemForm==='monetizacao'&&<>
+                <div className="field"><label>Descrição (Upsell / Projeto) *</label><input value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} placeholder="Ex: Criação de Landing Page" /></div>
+                <div className="field"><label>Valor (R$)</label><input type="number" value={ifields.valor||''} onChange={e=>setIfields((p:any)=>({...p,valor:e.target.value}))} placeholder="Ex: 1500" /></div>
+                <div className="field"><label>Data da Negociação</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
+                <div className="field"><label>Status do Pagamento</label>
+                  <select value={ifields.status||'pago'} onChange={e=>setIfields((p:any)=>({...p,status:e.target.value}))} style={{width:'100%',height:36,border:'1px solid #ccc',borderRadius:6,padding:'0 10px',outline:'none',background:'#fff'}}>
+                    <option value="pago">Pago</option>
+                    <option value="pendente">Pendente</option>
+                  </select>
+                </div>
+              </>}
+
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={()=>setItemForm(null)}>Cancelar</button>
@@ -317,6 +360,10 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                 else if(itemForm==='anotacao'){if(!ifields.texto?.trim())return alert('Escreva a anotação.');addItem('anotacoes',ifields)}
                 else if(itemForm==='arquivo'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('arquivos',ifields)}
                 else if(itemForm==='criativo'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('criativos',ifields)}
+                
+                // 🔴 ADICIONADA LÓGICA DE SALVAMENTO
+                else if(itemForm==='monetizacao'){if(!ifields.descricao?.trim())return alert('Informe a descrição da monetização.');addItem('monetizacoes',ifields)}
+                
                 setItemForm(null)
               }}>Salvar</button>
             </div>
