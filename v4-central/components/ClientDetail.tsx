@@ -183,7 +183,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                       border:'3px solid #fff', boxShadow:'0 0 0 1px #E8E6E3'}} />
                     
                     {/* Card do conteúdo */}
-                    <div style={{flex:1, background:'#FAFAFA', border:'1px solid #E8E6E3', borderRadius:8, padding:16, transition:'all 0.2s', hover:{background:'#fff'}}}>
+                    <div style={{flex:1, background:'#FAFAFA', border:'1px solid #E8E6E3', borderRadius:8, padding:16, transition:'all 0.2s'}} onMouseEnter={e=>(e.currentTarget.style.background='#fff')} onMouseLeave={e=>(e.currentTarget.style.background='#FAFAFA')}>
                       <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
                         <div style={{display:'flex', alignItems:'center', gap:8}}>
                           <span style={{fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:4, textTransform:'uppercase',
