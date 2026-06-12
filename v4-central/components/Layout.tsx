@@ -1,56 +1,122 @@
-import { useSession, signOut } from 'next-auth/react'
-import Link from 'next/link'
-import { useRouter } from 'next/router'
-import Image from 'next/image'
+import { useState, useEffect, ReactNode } from 'react'
+import Head from 'next/head'
+import { signOut } from 'next-auth/react' // Já deixei pronto pro seu NextAuth
 
-interface Props { children: React.ReactNode; title?: string; topbarRight?: React.ReactNode }
+interface LayoutProps {
+  children: ReactNode;
+  title?: string;
+  topbarRight?: ReactNode;
+}
 
-export default function Layout({ children, title = 'Central de Clientes', topbarRight }: Props) {
-  const { data: session } = useSession()
-  const router = useRouter()
-  const isAdmin = (session?.user as any)?.role === 'admin'
+export default function Layout({ children, title = 'Central', topbarRight }: LayoutProps) {
+  const [theme, setTheme] = useState('light')
+
+  // Ao carregar a página, verifica se o usuário já tinha salvo o Dark Mode
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'light'
+    setTheme(savedTheme)
+    document.documentElement.setAttribute('data-theme', savedTheme)
+  }, [])
+
+  // Função que inverte o tema e salva na memória
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light'
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }
 
   return (
     <div className="layout">
+      <Head>
+        <title>{title} — ACM&Co</title>
+      </Head>
+
+      {/* ── SIDEBAR (Menu Lateral) ── */}
       <aside className="sidebar">
         <div className="logo">
-          <Image src="/logo.png" alt="V4 ACM&Co" width={36} height={36} style={{borderRadius:8,objectFit:'cover'}} />
-          <span style={{fontSize:13,fontWeight:700,letterSpacing:'-0.3px'}}>ACM&Co</span>
+          <div className="logo-dot" />
+          ACM&Co Central
         </div>
-        <div className="sb-section">Menu</div>
-        <Link href="/" className={`sb-item ${router.pathname === '/' ? 'active' : ''}`}>
-          <span style={{fontSize:14}}>👥</span> Clientes
-        </Link>
-        <Link href="/checkin" className={`sb-item ${router.pathname === '/checkin' ? 'active' : ''}`}>
-          <span style={{fontSize:14}}>📋</span> Check-in PPT
-        </Link>
-        <Link href="/candidatura" className={`sb-item ${router.pathname === '/candidatura' ? 'active' : ''}`}>
-          <span style={{fontSize:14}}>📝</span> Candidatura
-        </Link>
-        <Link href="/produtividade" className={`sb-item ${router.pathname.startsWith('/produtividade') ? 'active' : ''}`}>
-          <span style={{fontSize:14}}>📊</span> Produtividade
-        </Link>
-        {isAdmin && (
-          <Link href="/usuarios" className={`sb-item ${router.pathname === '/usuarios' ? 'active' : ''}`}>
-            <span style={{fontSize:14}}>⚙️</span> Usuários
-          </Link>
-        )}
+
+        <div className="sb-section">Menu Principal</div>
+        
+        <a href="/" className="sb-item">
+          <div className="sb-dot" style={{background: 'var(--red)'}} />
+          Dashboard
+        </a>
+        
+        <a href="/checkin" className="sb-item">
+          <div className="sb-dot" style={{background: 'var(--text-muted)'}} />
+          Check-in PPT
+        </a>
+        
+        <a href="/produtividade" className="sb-item">
+          <div className="sb-dot" style={{background: 'var(--text-muted)'}} />
+          Produtividade
+        </a>
+
+        {/* Rodapé da Sidebar */}
         <div className="sb-footer">
           <div className="sb-user">
-            <strong>{session?.user?.name}</strong>
-            {session?.user?.email}
+            Acesso
+            <strong>Equipe Interna</strong>
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ width: '100%' }} onClick={() => signOut({ callbackUrl: '/login' })}>
-            Sair
+          <button 
+            onClick={() => signOut({ callbackUrl: '/login' })} 
+            className="btn btn-ghost btn-sm" 
+            style={{ width: '100%', justifyContent: 'flex-start', color: 'var(--text-secondary)' }}
+          >
+            Sair / Logout
           </button>
         </div>
       </aside>
+
+      {/* ── ÁREA PRINCIPAL ── */}
       <div className="main">
-        <div className="topbar">
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
-          {topbarRight}
-        </div>
-        <div className="content">{children}</div>
+        
+        {/* Topbar (Cabeçalho) */}
+        <header className="topbar">
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)' }}>
+            {title}
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            
+            {/* BOTÃO DE DARK MODE ☀️/🌙 */}
+            <button 
+              onClick={toggleTheme}
+              title={theme === 'light' ? 'Ativar Modo Escuro' : 'Ativar Modo Claro'}
+              style={{
+                background: 'var(--input-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '16px',
+                transition: 'all 0.2s',
+                color: 'var(--text-main)'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--input-bg)'}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+            
+            {/* Botões extras que vêm da página (ex: "Novo Cliente", "Voltar") */}
+            {topbarRight}
+          </div>
+        </header>
+        
+        {/* Conteúdo Dinâmico da Página */}
+        <main className="content">
+          {children}
+        </main>
+
       </div>
     </div>
   )
