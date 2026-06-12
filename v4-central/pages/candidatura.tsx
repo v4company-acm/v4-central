@@ -6,12 +6,20 @@ import Layout from '../components/Layout'
 
 const WEBHOOK = 'https://primary-production-3b127.up.railway.app/webhook/candidatura'
 
+// ── Design Tokens Dinâmicos (Dark/Light Mode) ──
 const C = {
-  bg:'#F2F1EF', card:'#FFFFFF', border:'#E8E6E3', border2:'#D4D1CC',
-  red:'#E8002D', redLight:'#FFF0F2', redMid:'#FFCDD5',
-  text:'#111111', text2:'#5A5A5A', text3:'#9A9A9A',
-  green:'#16A34A', greenBg:'#F0FDF4',
-  amber:'#D97706', amberBg:'#FFFBEB',
+  bg: 'var(--bg-color)',
+  card: 'var(--card-color)',
+  border: 'var(--border-color)',
+  border2: 'var(--border-light)',
+  text: 'var(--text-main)',
+  text2: 'var(--text-secondary)',
+  text3: 'var(--text-muted)',
+  red: '#E8002D', redLight: 'rgba(232, 0, 45, 0.1)', redMid: 'rgba(232, 0, 45, 0.2)',
+  green: '#16A34A', greenBg: 'rgba(22, 163, 74, 0.1)',
+  orange: '#EA580C', orangeBg: 'rgba(234, 88, 12, 0.1)',
+  amber: '#D97706', amberBg: 'rgba(217, 119, 6, 0.1)',
+  blue: '#2563EB', blueBg: 'rgba(37, 99, 235, 0.1)',
 }
 
 const AREAS: Record<string, { label: string; perguntas: { id: string; q: string }[] }> = {
