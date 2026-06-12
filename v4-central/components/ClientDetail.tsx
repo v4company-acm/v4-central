@@ -5,11 +5,15 @@ function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d
 function fmtR(v: any) { if(!v&&v!==0) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) }
 function fmtNum(v: any) { if(!v&&v!==0) return '—'; return Number(v).toLocaleString('pt-BR') }
 
+// 🔴 ABAS REFORMULADAS: Otimizações, Reuniões e Anotações unificadas em "Atividades"
 const TABS = [
-  {k:'dados',l:'Dados'},{k:'equipe',l:'Equipe'},{k:'links',l:'Links'},
-  {k:'metricas',l:'Métricas'},{k:'otimizacoes',l:'Otimizações'},
-  {k:'reunioes',l:'Reuniões'},{k:'anotacoes',l:'Anotações'},{k:'criativos',l:'Criativos'},
-  {k:'monetizacoes',l:'Monetizações'} // 🔴 NOVA ABA ADICIONADA AQUI
+  {k:'dados',l:'Visão Geral'},
+  {k:'atividades',l:'Histórico (Feed)'},
+  {k:'metricas',l:'Métricas e Dash'},
+  {k:'monetizacoes',l:'Monetizações'},
+  {k:'criativos',l:'Criativos'},
+  {k:'equipe',l:'Equipe'},
+  {k:'links',l:'Links'},
 ]
 
 interface Props { client: any; onUpdate: (c: any) => void }
@@ -27,16 +31,16 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
   // Melhores valores do histórico
   const bestRoas = historico.length ? Math.max(...historico.map((m:any)=>parseFloat(m.roas)||0)) : null
   const bestRoi = historico.length ? Math.max(...historico.map((m:any)=>parseFloat(m.roi)||0)) : null
-  const bestVendas = historico.length ? Math.max(...historico.map((m:any)=>parseInt(m.vendas)||0)) : null
 
   function addItem(field: string, item: any) {
     onUpdate({ ...c, [field]: [item, ...(c[field]||[])] })
   }
-  function removeItem(field: string, idx: number) {
-    if (!confirm('Remover?')) return
-    const arr = [...(c[field]||[])]
+  function removeItem(field: string, idx: number, realField?: string) {
+    if (!confirm('Remover este registro permanentemente?')) return
+    const targetField = realField || field
+    const arr = [...(c[targetField]||[])]
     arr.splice(idx, 1)
-    onUpdate({ ...c, [field]: arr })
+    onUpdate({ ...c, [targetField]: arr })
   }
 
   function salvarMetrica() {
@@ -48,324 +52,384 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
     setMfields({roas:'',cpl:'',leads:'',invest:'',roi:'',vendas:'',totalVendido:'',data:new Date().toISOString().slice(0,10)})
   }
 
+  // ── LÓGICA DO COCKPIT (Cálculos para o painel superior) ──
+  const totalMonetizado = (c.monetizacoes||[]).reduce((sum:number,m:any)=>sum+Number(m.valor||0),0)
+  
+  // Calcula dias para vencer o contrato
+  let diasVencimento = null
+  let corVencimento = '#111111'
+  if (c.fimContrato && c.fimContrato !== '-') {
+    const hoje = new Date()
+    const fim = new Date(c.fimContrato)
+    const diffTime = fim.getTime() - hoje.getTime()
+    diasVencimento = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    if (diasVencimento < 30) corVencimento = '#E8002D' // Vermelho
+    else if (diasVencimento < 60) corVencimento = '#D97706' // Amarelo
+    else corVencimento = '#16A34A' // Verde
+  }
+
+  // ── LÓGICA DA TIMELINE UNIFICADA ──
+  const timeline = [
+    ...(c.otimizacoes||[]).map((i:any, idx:number)=>({...i, _type:'otimizacao', _idx:idx})),
+    ...(c.reunioes||[]).map((i:any, idx:number)=>({...i, _type:'reuniao', _idx:idx})),
+    ...(c.anotacoes||[]).map((i:any, idx:number)=>({...i, _type:'anotacao', _idx:idx}))
+  ].sort((a,b) => new Date(b.data || '2000-01-01').getTime() - new Date(a.data || '2000-01-01').getTime())
+
   return (
-    <div className="detail-card">
-      <div className="detail-tabs">
-        {TABS.map(t => <button key={t.k} className={`detail-tab ${tab===t.k?'active':''}`} onClick={()=>setTab(t.k)}>{t.l}</button>)}
+    <div style={{background:'#fff', borderRadius:12, boxShadow:'0 4px 20px rgba(0,0,0,0.05)', overflow:'hidden'}}>
+      
+      {/* ── 1. COCKPIT SUPERIOR DINÂMICO ── */}
+      <div style={{padding:'20px 24px', background:'linear-gradient(to right, #fafafa, #ffffff)', borderBottom:'1px solid #E8E6E3', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:20}}>
+        
+        {/* Status */}
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <span style={{fontSize:11, fontWeight:700, color:'#9A9A9A', textTransform:'uppercase', letterSpacing:1}}>Status do Projeto</span>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div style={{width:10, height:10, borderRadius:'50%', background:c.status==='ativo'?'#16A34A':c.status==='atencao'?'#D97706':c.status==='churn'?'#E8002D':'#9A9A9A'}} />
+            <span style={{fontSize:16, fontWeight:800, color:'#111', textTransform:'capitalize'}}>{c.status || 'Não definido'}</span>
+          </div>
+        </div>
+
+        {/* Fim do Contrato */}
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <span style={{fontSize:11, fontWeight:700, color:'#9A9A9A', textTransform:'uppercase', letterSpacing:1}}>Vencimento do Contrato</span>
+          <span style={{fontSize:16, fontWeight:800, color:corVencimento}}>
+            {c.fimContrato ? fmtDate(c.fimContrato) : 'Não informado'}
+          </span>
+          {diasVencimento !== null && (
+            <span style={{fontSize:11, fontWeight:600, color:corVencimento, marginTop:-4}}>
+              ({diasVencimento > 0 ? `Faltam ${diasVencimento} dias` : `Venceu há ${Math.abs(diasVencimento)} dias`})
+            </span>
+          )}
+        </div>
+
+        {/* MRR */}
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <span style={{fontSize:11, fontWeight:700, color:'#9A9A9A', textTransform:'uppercase', letterSpacing:1}}>MRR Atual</span>
+          <span style={{fontSize:16, fontWeight:800, color:'#2563EB'}}>{fmtR(c.mrr)}</span>
+        </div>
+
+        {/* Monetização */}
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <span style={{fontSize:11, fontWeight:700, color:'#9A9A9A', textTransform:'uppercase', letterSpacing:1}}>Monetizações Extras</span>
+          <span style={{fontSize:16, fontWeight:800, color:'#16A34A'}}>{fmtR(totalMonetizado)}</span>
+        </div>
+
       </div>
 
-      <div className="detail-body">
+      {/* ── 2. NAVEGAÇÃO DE ABAS REFINADA ── */}
+      <div style={{display:'flex', gap:10, padding:'16px 24px', borderBottom:'1px solid #E8E6E3', overflowX:'auto'}}>
+        {TABS.map(t => (
+          <button key={t.k} onClick={()=>setTab(t.k)} style={{
+            padding:'8px 16px', borderRadius:20, fontSize:13, fontWeight:600, cursor:'pointer', border:'none', whiteSpace:'nowrap', transition:'all 0.2s',
+            background: tab === t.k ? '#111111' : '#F2F1EF',
+            color: tab === t.k ? '#FFFFFF' : '#5A5A5A',
+          }}>
+            {t.l}
+          </button>
+        ))}
+      </div>
 
+      {/* ── 3. CORPO DO COMPONENTE ── */}
+      <div style={{padding:'24px'}}>
+
+        {/* ABA: DADOS E VISÃO GERAL */}
         {tab==='dados' && <>
-          <div className="sec-title">Informações básicas</div>
-          <div className="info-row"><span className="info-key">Stakeholder</span><span className="info-val">{c.stakeholder||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Telefone</span><span className="info-val">{c.telefone||'—'}</span></div>
-          <div className="info-row"><span className="info-key">MRR</span><span className="info-val">{fmtR(c.mrr)}</span></div>
-          <div className="info-row"><span className="info-key">Valor total contrato</span><span className="info-val">{fmtR(c.valorTotal)}</span></div>
-          <div className="info-row"><span className="info-key">Fidelidade</span><span className="info-val">{c.fidelidade||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Entrada</span><span className="info-val">{fmtDate(c.dataEntrada)}</span></div>
-          <div className="info-row"><span className="info-key">Início do projeto</span><span className="info-val">{fmtDate(c.inicioProj)}</span></div>
-          <div className="info-row"><span className="info-key">Fim do contrato</span><span className="info-val">{fmtDate(c.fimContrato)}</span></div>
-          <div className="sec-title" style={{marginTop:16}}>Detalhes</div>
-          <div className="info-row"><span className="info-key">Canal de origem</span><span className="info-val">{c.canalOrigem||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Instagram</span><span className="info-val">{c.instagram&&c.instagram!=='-'?<a href={c.instagram} target="_blank" rel="noreferrer" style={{color:'#2563EB'}}>Ver perfil</a>:'—'}</span></div>
-          <div className="info-row"><span className="info-key">Site</span><span className="info-val">{c.site&&c.site!=='-'?<a href={c.site} target="_blank" rel="noreferrer" style={{color:'#2563EB'}}>Acessar</a>:'—'}</span></div>
-          <div className="info-row"><span className="info-key">Cohort</span><span className="info-val">{c.cohort||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Canais ativos</span><span className="info-val">{c.canais||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Produtos contratados</span><span className="info-val">{cats}</span></div>
-          {c.descricao&&c.descricao!=='-'&&<><div className="sec-title" style={{marginTop:16}}>Sobre o projeto</div><div className="note-block">{c.descricao}</div></>}
-          {c.promessa&&c.promessa!=='-'&&<><div className="sec-title" style={{marginTop:16}}>Promessas fora do escopo</div><div className="note-block">{c.promessa}</div></>}
-        </>}
-
-        {tab==='equipe' && <>
-          <div className="sec-title">Equipe V4</div>
-          <div className="info-row"><span className="info-key">Estrategista</span><span className="info-val">{c.estrategista||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Gestor de tráfego</span><span className="info-val">{c.gestor||'—'}</span></div>
-          <div className="info-row"><span className="info-key">Account</span><span className="info-val">{c.account||'—'}</span></div>
-          <div className="sec-title" style={{marginTop:16}}>Equipe de vendas</div>
-          <div className="info-row"><span className="info-key">Closer</span><span className="info-val">{c.closer||'—'}</span></div>
-          <div className="info-row"><span className="info-key">SDR</span><span className="info-val">{c.sdr||'—'}</span></div>
-        </>}
-
-        {tab==='links' && <>
-          <div className="sec-title">Links obrigatórios</div>
-          {[['Contrato',c.linkContrato],['Call de vendas',c.linkCall],['Transcrição da call',c.linkTranscricao],['V4 Marketing',c.linkV4],['BANT SDR',c.linkBant]].map(([l,v])=>(
-            <div key={l} className="link-row">
-              <span style={{color:'#6B6B6B',minWidth:160}}>{l}</span>
-              <span style={{flex:1,textAlign:'right'}}>{v?<a href={v as string} target="_blank" rel="noreferrer" style={{color:'#2563EB',fontSize:12}}>Abrir link</a>:'—'}</span>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:40}}>
+            <div>
+              <div className="sec-title" style={{fontSize:16, borderBottom:'2px solid #F2F1EF', paddingBottom:8, marginBottom:16}}>Informações de Contato</div>
+              <div className="info-row"><span className="info-key">Stakeholder</span><span className="info-val">{c.stakeholder||'—'}</span></div>
+              <div className="info-row"><span className="info-key">Telefone</span><span className="info-val">{c.telefone||'—'}</span></div>
+              <div className="info-row"><span className="info-key">Instagram</span><span className="info-val">{c.instagram&&c.instagram!=='-'?<a href={c.instagram} target="_blank" rel="noreferrer" style={{color:'#2563EB'}}>Abrir Perfil</a>:'—'}</span></div>
+              <div className="info-row"><span className="info-key">Site</span><span className="info-val">{c.site&&c.site!=='-'?<a href={c.site} target="_blank" rel="noreferrer" style={{color:'#2563EB'}}>Acessar Site</a>:'—'}</span></div>
             </div>
-          ))}
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:16,marginBottom:8}}>
-            <div className="sec-title" style={{margin:0}}>Links adicionais</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',url:''});setItemForm('arquivo')}}>+ Adicionar</button>
+            <div>
+              <div className="sec-title" style={{fontSize:16, borderBottom:'2px solid #F2F1EF', paddingBottom:8, marginBottom:16}}>Contexto do Projeto</div>
+              <div className="info-row"><span className="info-key">Data de Entrada</span><span className="info-val">{fmtDate(c.dataEntrada)}</span></div>
+              <div className="info-row"><span className="info-key">Cohort</span><span className="info-val">{c.cohort||'—'}</span></div>
+              <div className="info-row"><span className="info-key">Produtos</span><span className="info-val">{cats}</span></div>
+              <div className="info-row"><span className="info-key">Canais de Mídia</span><span className="info-val">{c.canais||'—'}</span></div>
+            </div>
           </div>
-          {(c.arquivos||[]).length===0?<div style={{fontSize:13,color:'#C4C4C4',padding:'8px 0'}}>Nenhum link adicional.</div>:
-            (c.arquivos||[]).map((a:any,i:number)=>(
-              <div key={i} className="link-row">
-                <div style={{flex:1}}><div style={{fontWeight:600}}>{a.titulo}</div>{a.url&&<a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:12,color:'#2563EB'}}>{a.url}</a>}</div>
-                <button className="btn btn-sm btn-danger" onClick={()=>removeItem('arquivos',i)}>×</button>
-              </div>
-            ))
-          }
+          {c.descricao&&c.descricao!=='-'&&<div style={{marginTop:24, background:'#FAFAFA', padding:16, borderRadius:8, borderLeft:'4px solid #D4D1CC'}}><strong style={{display:'block', marginBottom:4}}>Sobre o projeto:</strong>{c.descricao}</div>}
+          {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'#FFF0F2', padding:16, borderRadius:8, borderLeft:'4px solid #E8002D'}}><strong style={{display:'block', marginBottom:4, color:'#E8002D'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
         </>}
 
-        {tab==='metricas' && (
-          <>
-            <MetricsDashboard
-              historico={c.metricasHistorico || []}
-              clienteNome={c.nome}
-            />
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div className="sec-title" style={{margin:0}}>Histórico de métricas ({historico.length} entradas)</div>
-              {!metForm && <button className="btn btn-sm btn-primary" onClick={()=>setMetForm(true)}>+ Nova entrada</button>}
+        {/* ABA: HISTÓRICO (TIMELINE UNIFICADA) */}
+        {tab==='atividades' && <>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+            <div className="sec-title" style={{margin:0, fontSize:16}}>Feed de Atividades</div>
+            <div style={{display:'flex', gap:8}}>
+              <button className="btn btn-sm" style={{background:'#EFF6FF', color:'#2563EB', borderColor:'#BFDBFE'}} onClick={()=>{setIfields({texto:'',autor:'',data:new Date().toISOString().slice(0,10)});setItemForm('anotacao')}}>+ Anotação</button>
+              <button className="btn btn-sm" style={{background:'#FFFBEB', color:'#D97706', borderColor:'#FDE68A'}} onClick={()=>{setIfields({titulo:'',data:new Date().toISOString().slice(0,10),participantes:'',resumo:''});setItemForm('reuniao')}}>+ Reunião</button>
+              <button className="btn btn-sm" style={{background:'#F0FDF4', color:'#16A34A', borderColor:'#BBF7D0'}} onClick={()=>{setIfields({titulo:'',desc:'',resultado:'',data:new Date().toISOString().slice(0,10)});setItemForm('otimizacao')}}>+ Otimização</button>
             </div>
+          </div>
 
-            {metForm && (
-              <div style={{background:'#fafafa',border:'1px solid #eee',borderRadius:10,padding:16,marginBottom:16}}>
-                <div style={{fontWeight:600,fontSize:13,marginBottom:12}}>Nova entrada de métricas</div>
-                <div className="form-grid-4" style={{marginBottom:8}}>
-                  <div className="field"><label>Data *</label><input type="date" value={mfields.data} onChange={e=>setMfields((p:any)=>({...p,data:e.target.value}))} /></div>
-                  <div className="field"><label>ROAS</label><input value={mfields.roas} onChange={e=>setMfields((p:any)=>({...p,roas:e.target.value}))} placeholder="Ex: 4.8x" /></div>
-                  <div className="field"><label>ROI (%)</label><input type="number" value={mfields.roi} onChange={e=>setMfields((p:any)=>({...p,roi:e.target.value}))} placeholder="Ex: 320" /></div>
-                  <div className="field"><label>CPL (R$)</label><input type="number" value={mfields.cpl} onChange={e=>setMfields((p:any)=>({...p,cpl:e.target.value}))} /></div>
-                </div>
-                <div className="form-grid-4" style={{marginBottom:12}}>
-                  <div className="field"><label>Leads gerados</label><input type="number" value={mfields.leads} onChange={e=>setMfields((p:any)=>({...p,leads:e.target.value}))} /></div>
-                  <div className="field"><label>Qtd. de vendas</label><input type="number" value={mfields.vendas} onChange={e=>setMfields((p:any)=>({...p,vendas:e.target.value}))} /></div>
-                  <div className="field"><label>Total vendido (R$)</label><input type="number" value={mfields.totalVendido} onChange={e=>setMfields((p:any)=>({...p,totalVendido:e.target.value}))} /></div>
-                  <div className="field"><label>Investimento (R$)</label><input type="number" value={mfields.invest} onChange={e=>setMfields((p:any)=>({...p,invest:e.target.value}))} /></div>
-                </div>
-                <div style={{display:'flex',gap:8}}>
-                  <button className="btn btn-sm" onClick={()=>setMetForm(false)}>Cancelar</button>
-                  <button className="btn btn-primary btn-sm" onClick={salvarMetrica}>Salvar entrada</button>
-                </div>
+          {timeline.length === 0 ? <div className="empty">Nenhuma atividade registrada ainda para este cliente.</div> : (
+            <div style={{position:'relative', paddingLeft:16}}>
+              {/* Linha vertical da timeline */}
+              <div style={{position:'absolute', top:10, bottom:10, left:23, width:2, background:'#E8E6E3'}} />
+              
+              {timeline.map((item:any, i:number) => {
+                const isReuniao = item._type === 'reuniao';
+                const isOtimiza = item._type === 'otimizacao';
+                
+                return (
+                  <div key={i} style={{display:'flex', gap:16, marginBottom:24, position:'relative'}}>
+                    {/* Ícone bolinha */}
+                    <div style={{width:16, height:16, borderRadius:'50%', zIndex:2, marginTop:4, flexShrink:0,
+                      background: isReuniao ? '#D97706' : isOtimiza ? '#16A34A' : '#2563EB',
+                      border:'3px solid #fff', boxShadow:'0 0 0 1px #E8E6E3'}} />
+                    
+                    {/* Card do conteúdo */}
+                    <div style={{flex:1, background:'#FAFAFA', border:'1px solid #E8E6E3', borderRadius:8, padding:16, transition:'all 0.2s', hover:{background:'#fff'}}}>
+                      <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
+                        <div style={{display:'flex', alignItems:'center', gap:8}}>
+                          <span style={{fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:4, textTransform:'uppercase',
+                            background: isReuniao ? '#FFFBEB' : isOtimiza ? '#F0FDF4' : '#EFF6FF',
+                            color: isReuniao ? '#D97706' : isOtimiza ? '#16A34A' : '#2563EB',
+                          }}>
+                            {isReuniao ? 'Reunião' : isOtimiza ? 'Otimização' : 'Anotação'}
+                          </span>
+                          <span style={{fontSize:12, color:'#9A9A9A', fontWeight:600}}>{fmtDate(item.data)}</span>
+                        </div>
+                        <button style={{background:'none', border:'none', color:'#E8002D', cursor:'pointer', fontSize:14}} onClick={()=>removeItem(item._type==='otimizacao'?'otimizacoes':item._type==='reuniao'?'reunioes':'anotacoes', item._idx)}>×</button>
+                      </div>
+                      
+                      <div style={{fontSize:15, fontWeight:700, color:'#111', marginBottom:4}}>{item.titulo || item.texto}</div>
+                      
+                      {isReuniao && <div style={{fontSize:13, color:'#5A5A5A'}}><strong>Participantes:</strong> {item.participantes||'Nenhum'}</div>}
+                      {isReuniao && item.resumo && <div style={{fontSize:13, color:'#5A5A5A', marginTop:4}}>{item.resumo}</div>}
+                      
+                      {isOtimiza && <div style={{fontSize:13, color:'#5A5A5A'}}><strong>Resultado:</strong> <span style={{color:'#16A34A', fontWeight:600}}>{item.resultado||'Pendente'}</span></div>}
+                      {isOtimiza && item.desc && <div style={{fontSize:13, color:'#5A5A5A', marginTop:4}}>{item.desc}</div>}
+                      
+                      {!isReuniao && !isOtimiza && item.autor && <div style={{fontSize:12, color:'#9A9A9A', marginTop:6}}>Feito por: {item.autor}</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>}
+
+        {/* ABA: MÉTRICAS E DASHBOARD */}
+        {tab==='metricas' && <>
+          <MetricsDashboard historico={c.metricasHistorico || []} clienteNome={c.nome} />
+          
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12, marginTop:24}}>
+            <div className="sec-title" style={{margin:0}}>Registros Brutos de Performance</div>
+            {!metForm && <button className="btn btn-sm btn-primary" onClick={()=>setMetForm(true)}>+ Registrar Semana</button>}
+          </div>
+
+          {metForm && (
+            <div style={{background:'#FAFAFA',border:'1px solid #E8E6E3',borderRadius:10,padding:20,marginBottom:20}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:16,color:'#111'}}>Preencher dados de performance</div>
+              <div className="form-grid-4" style={{marginBottom:12}}>
+                <div className="field"><label>Data Base *</label><input type="date" value={mfields.data} onChange={e=>setMfields((p:any)=>({...p,data:e.target.value}))} /></div>
+                <div className="field"><label>ROAS (Ex: 4.8x)</label><input value={mfields.roas} onChange={e=>setMfields((p:any)=>({...p,roas:e.target.value}))} /></div>
+                <div className="field"><label>ROI (%)</label><input type="number" value={mfields.roi} onChange={e=>setMfields((p:any)=>({...p,roi:e.target.value}))} /></div>
+                <div className="field"><label>CPL (R$)</label><input type="number" value={mfields.cpl} onChange={e=>setMfields((p:any)=>({...p,cpl:e.target.value}))} /></div>
               </div>
-            )}
+              <div className="form-grid-4" style={{marginBottom:20}}>
+                <div className="field"><label>Leads Totais</label><input type="number" value={mfields.leads} onChange={e=>setMfields((p:any)=>({...p,leads:e.target.value}))} /></div>
+                <div className="field"><label>Qtd. Vendas</label><input type="number" value={mfields.vendas} onChange={e=>setMfields((p:any)=>({...p,vendas:e.target.value}))} /></div>
+                <div className="field"><label>Faturamento (R$)</label><input type="number" value={mfields.totalVendido} onChange={e=>setMfields((p:any)=>({...p,totalVendido:e.target.value}))} /></div>
+                <div className="field"><label>Investimento (R$)</label><input type="number" value={mfields.invest} onChange={e=>setMfields((p:any)=>({...p,invest:e.target.value}))} /></div>
+              </div>
+              <div style={{display:'flex',gap:10}}>
+                <button className="btn btn-sm" onClick={()=>setMetForm(false)}>Cancelar</button>
+                <button className="btn btn-primary btn-sm" onClick={salvarMetrica}>Salvar Dados</button>
+              </div>
+            </div>
+          )}
 
-            {historico.length === 0
-              ? <div className="empty">Nenhuma métrica registrada ainda.<br/>Clique em "+ Nova entrada" para começar.</div>
-              : <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                    <thead>
-                      <tr style={{borderBottom:'1px solid #eee'}}>
-                        {['Data','ROAS','ROI','CPL','Leads','Vendas','Total vendido','Investimento'].map(h=>(
-                          <th key={h} style={{textAlign:'left',padding:'8px 10px',fontSize:11,fontWeight:700,color:'#6B6B6B',textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>{h}</th>
-                        ))}
-                        <th></th>
+          {historico.length === 0 ? <div className="empty">Nenhuma métrica registrada ainda.</div> : 
+            <div style={{overflowX:'auto', background:'#fff', border:'1px solid #E8E6E3', borderRadius:8}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{background:'#F2F1EF', borderBottom:'1px solid #D4D1CC'}}>
+                    {['Data','ROAS','ROI','CPL','Leads','Vendas','Faturamento','Investimento',''].map(h=> <th key={h} style={{textAlign:'left',padding:'12px',fontSize:11,fontWeight:700,color:'#5A5A5A',textTransform:'uppercase'}}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {historico.map((m:any,i:number)=>{
+                    const isTop = parseFloat(m.roas||0) === bestRoas && bestRoas && bestRoas > 0
+                    return (
+                      <tr key={i} style={{borderBottom:'1px solid #E8E6E3',background:isTop?'#FEF2F2':'transparent'}}>
+                        <td style={{padding:'12px',fontWeight:600}}>{fmtDate(m.data)} {isTop && <span style={{background:'#E8002D',color:'#fff',fontSize:10,padding:'2px 6px',borderRadius:4,marginLeft:6}}>Recorde</span>}</td>
+                        <td style={{padding:'12px',fontWeight:700}}>{m.roas||'—'}</td>
+                        <td style={{padding:'12px'}}>{m.roi?m.roi+'%':'—'}</td>
+                        <td style={{padding:'12px'}}>{m.cpl?'R$'+m.cpl:'—'}</td>
+                        <td style={{padding:'12px'}}>{m.leads?fmtNum(m.leads):'—'}</td>
+                        <td style={{padding:'12px'}}>{m.vendas?fmtNum(m.vendas):'—'}</td>
+                        <td style={{padding:'12px',color:'#16A34A',fontWeight:600}}>{m.totalVendido?fmtR(m.totalVendido):'—'}</td>
+                        <td style={{padding:'12px',color:'#D97706'}}>{m.invest?fmtR(m.invest):'—'}</td>
+                        <td style={{padding:'12px',textAlign:'right'}}><button className="btn btn-sm btn-danger" onClick={()=>{if(!confirm('Remover esta entrada?'))return;const arr=[...historico];arr.splice(i,1);onUpdate({...c,metricasHistorico:arr,metricas:arr[0]||{}})}}>Excluir</button></td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {historico.map((m:any,i:number)=>{
-                        const isTop = parseFloat(m.roas||0) === bestRoas && bestRoas && bestRoas > 0
-                        return (
-                          <tr key={i} style={{borderBottom:'1px solid #f5f5f5',background:isTop?'#fff8f8':'transparent'}}>
-                            <td style={{padding:'9px 10px',fontWeight:500,whiteSpace:'nowrap'}}>{fmtDate(m.data)} {isTop && <span style={{background:'#D72B2B',color:'#fff',fontSize:10,padding:'1px 6px',borderRadius:10,marginLeft:4}}>★</span>}</td>
-                            <td style={{padding:'9px 10px'}}>{m.roas||'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.roi?m.roi+'%':'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.cpl?'R$'+m.cpl:'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.leads?fmtNum(m.leads):'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.vendas?fmtNum(m.vendas):'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.totalVendido?fmtR(m.totalVendido):'—'}</td>
-                            <td style={{padding:'9px 10px'}}>{m.invest?fmtR(m.invest):'—'}</td>
-                            <td style={{padding:'9px 10px'}}><button className="btn btn-sm btn-danger" onClick={()=>{if(!confirm('Remover esta entrada?'))return;const arr=[...historico];arr.splice(i,1);onUpdate({...c,metricasHistorico:arr,metricas:arr[0]||{}})}}>×</button></td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-            }
-          </>
-        )}
-
-        {tab==='otimizacoes' && <>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>{(c.otimizacoes||[]).length} otimizações</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',desc:'',resultado:'',data:''});setItemForm('otimizacao')}}>+ Adicionar</button>
-          </div>
-          {(c.otimizacoes||[]).length===0?<div className="empty">Nenhuma otimização registrada.</div>:
-            (c.otimizacoes||[]).map((o:any,i:number)=>(
-              <div key={i} className="item-row">
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <div className="item-title">{o.titulo}</div>
-                  <button className="btn btn-sm btn-danger" onClick={()=>removeItem('otimizacoes',i)}>×</button>
-                </div>
-                <div className="item-meta">{o.resultado} {o.data&&'· '+fmtDate(o.data)}</div>
-                {o.desc&&<div style={{fontSize:12,color:'#6B6B6B',marginTop:3}}>{o.desc}</div>}
-              </div>
-            ))
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           }
         </>}
 
-        {tab==='reunioes' && <>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>{(c.reunioes||[]).length} reuniões</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',data:new Date().toISOString().slice(0,10),participantes:'',resumo:''});setItemForm('reuniao')}}>+ Adicionar</button>
+        {/* DEMAIS ABAS (Monetizações, Criativos, Equipe, Links) */}
+        {tab==='monetizacoes' && <>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+            <div className="sec-title" style={{margin:0, fontSize:16}}>Histórico de Upsells e Cross-sells</div>
+            <button className="btn btn-sm btn-primary" onClick={()=>{setIfields({descricao:'',valor:'',data:new Date().toISOString().slice(0,10),status:'pago'});setItemForm('monetizacao')}}>+ Registrar Monetização</button>
           </div>
-          {(c.reunioes||[]).length===0?<div className="empty">Nenhuma reunião registrada.</div>:
-            (c.reunioes||[]).map((r:any,i:number)=>(
-              <div key={i} className="item-row">
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <div className="item-title">{r.titulo}</div>
-                  <button className="btn btn-sm btn-danger" onClick={()=>removeItem('reunioes',i)}>×</button>
+          {(c.monetizacoes||[]).length===0?<div className="empty">Este cliente ainda não teve monetizações extras.</div>:
+            <div style={{display:'grid', gap:12}}>
+              {(c.monetizacoes||[]).map((m:any,i:number)=>(
+                <div key={i} style={{background:'#fff', border:'1px solid #E8E6E3', borderRadius:8, padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`4px solid ${m.status==='pago'?'#16A34A':'#D97706'}`}}>
+                  <div>
+                    <div style={{fontSize:15, fontWeight:700, color:'#111', marginBottom:4}}>{m.descricao}</div>
+                    <div style={{fontSize:12, color:'#9A9A9A', fontWeight:600}}>{m.data&&fmtDate(m.data)} <span style={{margin:'0 8px'}}>•</span> <span style={{color:m.status==='pago'?'#16A34A':'#D97706'}}>{m.status==='pago'?'Status: Pago':'Status: Pendente'}</span></div>
+                  </div>
+                  <div style={{display:'flex', alignItems:'center', gap:16}}>
+                    <span style={{fontSize:18, fontWeight:800, color:'#111'}}>{fmtR(m.valor)}</span>
+                    <button style={{background:'#FFF0F2', border:'1px solid #FFCDD5', color:'#E8002D', width:28, height:28, borderRadius:6, cursor:'pointer', fontWeight:700}} onClick={()=>removeItem('monetizacoes',i)}>×</button>
+                  </div>
                 </div>
-                <div className="item-meta">{r.data&&fmtDate(r.data)} {r.participantes&&'· '+r.participantes}</div>
-                {r.resumo&&<div style={{fontSize:12,color:'#6B6B6B',marginTop:3}}>{r.resumo}</div>}
-              </div>
-            ))
-          }
-        </>}
-
-        {tab==='anotacoes' && <>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>{(c.anotacoes||[]).length} anotações</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({texto:'',autor:'',data:new Date().toISOString().slice(0,10)});setItemForm('anotacao')}}>+ Adicionar</button>
-          </div>
-          {(c.anotacoes||[]).length===0?<div className="empty">Nenhuma anotação registrada.</div>:
-            (c.anotacoes||[]).map((a:any,i:number)=>(
-              <div key={i} className="note-block">
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <span>{a.texto}</span>
-                  <button className="btn btn-sm btn-danger" onClick={()=>removeItem('anotacoes',i)} style={{marginLeft:8}}>×</button>
-                </div>
-                <div className="item-meta" style={{marginTop:4}}>{a.autor} {a.data&&'· '+fmtDate(a.data)}</div>
-              </div>
-            ))
+              ))}
+            </div>
           }
         </>}
 
         {tab==='criativos' && <>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>Repertório de criativos ({(c.criativos||[]).length})</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',url:'',tipo:'imagem',descricao:''});setItemForm('criativo')}}>+ Adicionar</button>
+            <div className="sec-title" style={{margin:0}}>Repertório de Criativos</div>
+            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',url:'',descricao:''});setItemForm('criativo')}}>+ Adicionar Mídia</button>
           </div>
-          <p style={{fontSize:12,color:'#6B6B6B',marginBottom:16}}>Adicione links de imagens, vídeos ou referências para o time de design.</p>
-          {(c.criativos||[]).length===0
-            ? <div className="empty">Nenhum criativo adicionado ainda.<br/>Cole links de imagens do Google Drive, Pinterest, Behance etc.</div>
-            : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
-                {(c.criativos||[]).map((cr:any,i:number)=>(
-                  <div key={i} style={{border:'1px solid #eee',borderRadius:10,overflow:'hidden',background:'#fff'}}>
-                    {cr.url && (cr.url.match(/\.(jpg|jpeg|png|gif|webp)/i) || cr.url.includes('drive.google.com')) ? (
-                      <div style={{height:140,background:'#f4f4f4',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                        <img src={cr.url} alt={cr.titulo} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{(e.target as any).style.display='none'}} />
-                      </div>
-                    ) : (
-                      <div style={{height:80,background:'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <span style={{fontSize:28}}>🎨</span>
-                      </div>
-                    )}
-                    <div style={{padding:'10px 12px'}}>
-                      <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{cr.titulo}</div>
-                      {cr.descricao&&<div style={{fontSize:12,color:'#6B6B6B',marginBottom:6}}>{cr.descricao}</div>}
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        {cr.url&&<a href={cr.url} target="_blank" rel="noreferrer" style={{fontSize:12,color:'#2563EB'}}>Abrir link</a>}
-                        <button className="btn btn-sm btn-danger" onClick={()=>removeItem('criativos',i)}>×</button>
-                      </div>
+          {(c.criativos||[]).length===0 ? <div className="empty">Galeria vazia. Cole links do Drive, Pinterest, Ads Library etc.</div> : 
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:16}}>
+              {(c.criativos||[]).map((cr:any,i:number)=>(
+                <div key={i} style={{border:'1px solid #E8E6E3',borderRadius:8,overflow:'hidden',background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.03)'}}>
+                  {cr.url && (cr.url.match(/\.(jpg|jpeg|png|gif|webp)/i) || cr.url.includes('drive.google.com')) ? (
+                    <div style={{height:150,background:'#F2F1EF',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                      <img src={cr.url} alt={cr.titulo} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{(e.target as any).style.display='none'}} />
+                    </div>
+                  ) : (
+                    <div style={{height:100,background:'#EFF6FF',display:'flex',alignItems:'center',justifyContent:'center', fontSize:32}}>🎨</div>
+                  )}
+                  <div style={{padding:'12px 16px'}}>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:6,color:'#111'}}>{cr.titulo}</div>
+                    {cr.descricao&&<div style={{fontSize:12,color:'#5A5A5A',marginBottom:12,lineHeight:1.4}}>{cr.descricao}</div>}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      {cr.url&&<a href={cr.url} target="_blank" rel="noreferrer" style={{fontSize:12,color:'#2563EB',fontWeight:600,textDecoration:'none'}}>Acessar Original ↗</a>}
+                      <button style={{border:'none',background:'none',color:'#E8002D',cursor:'pointer',fontSize:12,fontWeight:600}} onClick={()=>removeItem('criativos',i)}>Apagar</button>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
           }
         </>}
 
-        {/* 🔴 NOVA ABA DE MONETIZAÇÕES */}
-        {tab==='monetizacoes' && <>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="sec-title" style={{margin:0}}>Histórico de Monetizações Extras</div>
-            <button className="btn btn-sm" onClick={()=>{setIfields({descricao:'',valor:'',data:new Date().toISOString().slice(0,10),status:'pago'});setItemForm('monetizacao')}}>+ Adicionar</button>
+        {tab==='equipe' && <>
+          <div className="sec-title">Squad de Atendimento (V4)</div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:32}}>
+            <div style={{background:'#FAFAFA', padding:16, borderRadius:8, border:'1px solid #E8E6E3'}}><div style={{fontSize:11, color:'#9A9A9A', fontWeight:700, textTransform:'uppercase'}}>Estrategista Principal</div><div style={{fontSize:15, fontWeight:600, color:'#111', marginTop:4}}>{c.estrategista||'Não definido'}</div></div>
+            <div style={{background:'#FAFAFA', padding:16, borderRadius:8, border:'1px solid #E8E6E3'}}><div style={{fontSize:11, color:'#9A9A9A', fontWeight:700, textTransform:'uppercase'}}>Gestor de Tráfego</div><div style={{fontSize:15, fontWeight:600, color:'#111', marginTop:4}}>{c.gestor||'Não definido'}</div></div>
+            <div style={{background:'#FAFAFA', padding:16, borderRadius:8, border:'1px solid #E8E6E3'}}><div style={{fontSize:11, color:'#9A9A9A', fontWeight:700, textTransform:'uppercase'}}>Account Executive</div><div style={{fontSize:15, fontWeight:600, color:'#111', marginTop:4}}>{c.account||'Não definido'}</div></div>
           </div>
-          
-          <div style={{marginBottom:16, padding:'14px 16px', background:'#EFF6FF', borderRadius:10, border:'1px solid #BFDBFE', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <span style={{fontSize:14, fontWeight:700, color:'#1E3A8A', letterSpacing:0.5}}>TOTAL MONETIZADO</span>
-            <span style={{fontSize:18, fontWeight:900, color:'#1E3A8A'}}>{fmtR((c.monetizacoes||[]).reduce((sum:number,m:any)=>sum+Number(m.valor||0),0))}</span>
+          <div className="sec-title">Squad Comercial (Vendas)</div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+            <div style={{background:'#FAFAFA', padding:16, borderRadius:8, border:'1px solid #E8E6E3'}}><div style={{fontSize:11, color:'#9A9A9A', fontWeight:700, textTransform:'uppercase'}}>Closer Responsável</div><div style={{fontSize:15, fontWeight:600, color:'#111', marginTop:4}}>{c.closer||'Não definido'}</div></div>
+            <div style={{background:'#FAFAFA', padding:16, borderRadius:8, border:'1px solid #E8E6E3'}}><div style={{fontSize:11, color:'#9A9A9A', fontWeight:700, textTransform:'uppercase'}}>SDR (Pré-vendas)</div><div style={{fontSize:15, fontWeight:600, color:'#111', marginTop:4}}>{c.sdr||'Não definido'}</div></div>
+          </div>
+        </>}
+
+        {tab==='links' && <>
+          <div className="sec-title" style={{fontSize:16}}>Documentação Base</div>
+          <div style={{background:'#fff', border:'1px solid #E8E6E3', borderRadius:8, overflow:'hidden', marginBottom:24}}>
+            {[['Contrato Assinado',c.linkContrato],['Call de Vendas (Vídeo)',c.linkCall],['Transcrição da Call',c.linkTranscricao],['Drive V4 Marketing',c.linkV4],['BANT do SDR',c.linkBant]].map(([l,v], idx)=>(
+              <div key={l} style={{display:'flex', justifyContent:'space-between', padding:'14px 20px', borderBottom: idx===4?'none':'1px solid #F2F1EF', background: idx%2===0?'#FAFAFA':'#fff'}}>
+                <span style={{fontWeight:600, color:'#5A5A5A'}}>{l}</span>
+                <span>{v?<a href={v as string} target="_blank" rel="noreferrer" style={{color:'#2563EB',fontWeight:600,textDecoration:'none'}}>Acessar Link ↗</a>:<span style={{color:'#9A9A9A', fontSize:12}}>Pendente</span>}</span>
+              </div>
+            ))}
           </div>
 
-          {(c.monetizacoes||[]).length===0?<div className="empty">Nenhuma monetização registrada ainda.</div>:
-            (c.monetizacoes||[]).map((m:any,i:number)=>(
-              <div key={i} className="item-row" style={{borderLeft: `4px solid ${m.status==='pago'?'#16A34A':'#EA580C'}`, paddingLeft:12}}>
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <div className="item-title" style={{fontSize:14}}>{m.descricao}</div>
-                  <button className="btn btn-sm btn-danger" onClick={()=>removeItem('monetizacoes',i)}>×</button>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <div className="sec-title" style={{margin:0, fontSize:16}}>Outros Links Úteis</div>
+            <button className="btn btn-sm" onClick={()=>{setIfields({titulo:'',url:''});setItemForm('arquivo')}}>+ Adicionar Link</button>
+          </div>
+          {(c.arquivos||[]).length===0?<div className="empty">Nenhum link adicional registrado.</div>:
+            <div style={{display:'grid', gap:8}}>
+              {(c.arquivos||[]).map((a:any,i:number)=>(
+                <div key={i} style={{background:'#FAFAFA', border:'1px solid #E8E6E3', borderRadius:8, padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div style={{fontWeight:600}}>{a.titulo} {a.url&&<a href={a.url} target="_blank" rel="noreferrer" style={{marginLeft:12, fontSize:12, color:'#2563EB', textDecoration:'none', fontWeight:400}}>{a.url}</a>}</div>
+                  <button style={{background:'none', border:'none', color:'#E8002D', cursor:'pointer', fontSize:14}} onClick={()=>removeItem('arquivos',i)}>×</button>
                 </div>
-                <div style={{display:'flex', justifyContent:'space-between', marginTop:6, alignItems:'center'}}>
-                  <div className="item-meta">
-                    {m.data&&fmtDate(m.data)} <span style={{margin:'0 6px'}}>·</span> 
-                    <span style={{color:m.status==='pago'?'#16A34A':'#EA580C', fontWeight:700, fontSize:11, textTransform:'uppercase'}}>
-                      {m.status==='pago'?'Pago':'Pendente'}
-                    </span>
-                  </div>
-                  <div style={{fontWeight:800, color:'#111', fontSize:14}}>{fmtR(m.valor)}</div>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           }
         </>}
       </div>
 
+      {/* ── 4. MODAL GENÉRICO DE CADASTRO ── */}
       {itemForm && (
-        <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setItemForm(null)}}>
-          <div className="modal modal-sm">
-            <div className="modal-header">
-              {/* 🔴 ADICIONADO TÍTULO DO MODAL DE MONETIZAÇÃO */}
-              <h3>{{otimizacao:'Nova otimização',reuniao:'Nova reunião',anotacao:'Nova anotação',arquivo:'Novo link',criativo:'Novo criativo',monetizacao:'Nova monetização'}[itemForm as string]}</h3>
+        <div className="overlay" style={{background:'rgba(0,0,0,0.6)', backdropFilter:'blur(2px)'}} onClick={e=>{if(e.target===e.currentTarget)setItemForm(null)}}>
+          <div className="modal modal-sm" style={{borderRadius:12, boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
+            <div className="modal-header" style={{background:'#FAFAFA', borderBottom:'1px solid #E8E6E3', borderRadius:'12px 12px 0 0'}}>
+              <h3 style={{fontSize:16, fontWeight:800}}>{{otimizacao:'Registrar Otimização',reuniao:'Agendar/Registrar Reunião',anotacao:'Adicionar Anotação',arquivo:'Novo Link Rápido',criativo:'Salvar Criativo',monetizacao:'Registrar Monetização Extra'}[itemForm as string]}</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>setItemForm(null)}>✕</button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{padding:24}}>
               {itemForm==='otimizacao'&&<>
-                <div className="field"><label>Título *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
-                <div className="field"><label>Descrição</label><textarea value={ifields.desc||''} onChange={e=>setIfields((p:any)=>({...p,desc:e.target.value}))} /></div>
-                <div className="field"><label>Resultado</label><input value={ifields.resultado||''} onChange={e=>setIfields((p:any)=>({...p,resultado:e.target.value}))} placeholder="Ex: +22% CTR" /></div>
-                <div className="field"><label>Data</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
+                <div className="field"><label>O que foi feito? (Título) *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
+                <div className="field"><label>Qual foi o resultado percebido?</label><input value={ifields.resultado||''} onChange={e=>setIfields((p:any)=>({...p,resultado:e.target.value}))} placeholder="Ex: CPL caiu 20%" /></div>
+                <div className="field"><label>Detalhes da ação</label><textarea value={ifields.desc||''} onChange={e=>setIfields((p:any)=>({...p,desc:e.target.value}))} rows={3} /></div>
+                <div className="field"><label>Data da otimização</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
               </>}
               {itemForm==='reuniao'&&<>
-                <div className="field"><label>Título *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
+                <div className="field"><label>Pauta da Reunião *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
                 <div className="field"><label>Data</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
-                <div className="field"><label>Participantes</label><input value={ifields.participantes||''} onChange={e=>setIfields((p:any)=>({...p,participantes:e.target.value}))} /></div>
-                <div className="field"><label>Resumo / próximos passos</label><textarea value={ifields.resumo||''} onChange={e=>setIfields((p:any)=>({...p,resumo:e.target.value}))} /></div>
+                <div className="field"><label>Quem participou?</label><input value={ifields.participantes||''} onChange={e=>setIfields((p:any)=>({...p,participantes:e.target.value}))} placeholder="Ex: Cliente, João (ACC), Maria (SDR)" /></div>
+                <div className="field"><label>Resumo e Próximos Passos</label><textarea value={ifields.resumo||''} onChange={e=>setIfields((p:any)=>({...p,resumo:e.target.value}))} rows={3} /></div>
               </>}
               {itemForm==='anotacao'&&<>
-                <div className="field"><label>Anotação *</label><textarea value={ifields.texto||''} onChange={e=>setIfields((p:any)=>({...p,texto:e.target.value}))} /></div>
-                <div className="field"><label>Autor</label><input value={ifields.autor||''} onChange={e=>setIfields((p:any)=>({...p,autor:e.target.value}))} /></div>
+                <div className="field"><label>Anotação / Observação *</label><textarea value={ifields.texto||''} onChange={e=>setIfields((p:any)=>({...p,texto:e.target.value}))} rows={4} placeholder="Escreva informações importantes para o time..." /></div>
+                <div className="field"><label>Seu Nome (Autor)</label><input value={ifields.autor||''} onChange={e=>setIfields((p:any)=>({...p,autor:e.target.value}))} /></div>
                 <div className="field"><label>Data</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
               </>}
               {itemForm==='arquivo'&&<>
-                <div className="field"><label>Título *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
+                <div className="field"><label>Nome do Link *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
                 <div className="field"><label>URL</label><input value={ifields.url||''} onChange={e=>setIfields((p:any)=>({...p,url:e.target.value}))} placeholder="https://..." /></div>
               </>}
               {itemForm==='criativo'&&<>
-                <div className="field"><label>Título / nome do criativo *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} placeholder="Ex: Banner promo março" /></div>
-                <div className="field"><label>Link (Drive, Pinterest, Behance...)</label><input value={ifields.url||''} onChange={e=>setIfields((p:any)=>({...p,url:e.target.value}))} placeholder="https://..." /></div>
-                <div className="field"><label>Descrição / observações</label><textarea value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} placeholder="Ex: Referência de cor, estilo, formato..." /></div>
+                <div className="field"><label>Nome da Campanha / Criativo *</label><input value={ifields.titulo||''} onChange={e=>setIfields((p:any)=>({...p,titulo:e.target.value}))} /></div>
+                <div className="field"><label>Link da Imagem/Vídeo</label><input value={ifields.url||''} onChange={e=>setIfields((p:any)=>({...p,url:e.target.value}))} placeholder="https://..." /></div>
+                <div className="field"><label>Instruções / Copy</label><textarea value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} rows={3} /></div>
               </>}
-
-              {/* 🔴 ADICIONADO CORPO DO MODAL DE MONETIZAÇÃO */}
               {itemForm==='monetizacao'&&<>
-                <div className="field"><label>Descrição (Upsell / Projeto) *</label><input value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} placeholder="Ex: Criação de Landing Page" /></div>
-                <div className="field"><label>Valor (R$)</label><input type="number" value={ifields.valor||''} onChange={e=>setIfields((p:any)=>({...p,valor:e.target.value}))} placeholder="Ex: 1500" /></div>
-                <div className="field"><label>Data da Negociação</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
+                <div className="field"><label>Motivo (Upsell / Novo Projeto) *</label><input value={ifields.descricao||''} onChange={e=>setIfields((p:any)=>({...p,descricao:e.target.value}))} placeholder="Ex: Contratação de SEO" /></div>
+                <div className="field"><label>Valor Faturado (R$)</label><input type="number" value={ifields.valor||''} onChange={e=>setIfields((p:any)=>({...p,valor:e.target.value}))} placeholder="Ex: 2500" /></div>
+                <div className="field"><label>Data de Fechamento</label><input type="date" value={ifields.data||''} onChange={e=>setIfields((p:any)=>({...p,data:e.target.value}))} /></div>
                 <div className="field"><label>Status do Pagamento</label>
-                  <select value={ifields.status||'pago'} onChange={e=>setIfields((p:any)=>({...p,status:e.target.value}))} style={{width:'100%',height:36,border:'1px solid #ccc',borderRadius:6,padding:'0 10px',outline:'none',background:'#fff'}}>
-                    <option value="pago">Pago</option>
-                    <option value="pendente">Pendente</option>
+                  <select value={ifields.status||'pago'} onChange={e=>setIfields((p:any)=>({...p,status:e.target.value}))} style={{width:'100%',height:40,border:'1px solid #D4D1CC',borderRadius:6,padding:'0 12px',outline:'none',background:'#fff'}}>
+                    <option value="pago">Já foi Pago</option>
+                    <option value="pendente">Aguardando Pagamento</option>
                   </select>
                 </div>
               </>}
-
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{padding:'16px 24px', background:'#FAFAFA', borderTop:'1px solid #E8E6E3', borderRadius:'0 0 12px 12px'}}>
               <button className="btn" onClick={()=>setItemForm(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={()=>{
                 if(itemForm==='otimizacao'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('otimizacoes',ifields)}
-                else if(itemForm==='reuniao'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('reunioes',ifields)}
+                else if(itemForm==='reuniao'){if(!ifields.titulo?.trim())return alert('Informe a pauta.');addItem('reunioes',ifields)}
                 else if(itemForm==='anotacao'){if(!ifields.texto?.trim())return alert('Escreva a anotação.');addItem('anotacoes',ifields)}
-                else if(itemForm==='arquivo'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('arquivos',ifields)}
-                else if(itemForm==='criativo'){if(!ifields.titulo?.trim())return alert('Informe o título.');addItem('criativos',ifields)}
-                
-                // 🔴 ADICIONADA LÓGICA DE SALVAMENTO
-                else if(itemForm==='monetizacao'){if(!ifields.descricao?.trim())return alert('Informe a descrição da monetização.');addItem('monetizacoes',ifields)}
-                
+                else if(itemForm==='arquivo'){if(!ifields.titulo?.trim())return alert('Informe o nome do link.');addItem('arquivos',ifields)}
+                else if(itemForm==='criativo'){if(!ifields.titulo?.trim())return alert('Informe o nome.');addItem('criativos',ifields)}
+                else if(itemForm==='monetizacao'){if(!ifields.descricao?.trim())return alert('Descreva o motivo da monetização.');addItem('monetizacoes',ifields)}
                 setItemForm(null)
-              }}>Salvar</button>
+              }}>Salvar Registro</button>
             </div>
           </div>
         </div>
