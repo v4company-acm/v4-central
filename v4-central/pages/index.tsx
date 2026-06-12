@@ -28,7 +28,7 @@ function fmtR(v: number) { return `R$ ${v.toLocaleString('pt-BR',{minimumFractio
 
 const TOOLS = [
   { label:'Ekyte',         icon:'🎯', href:'https://app.ekyte.com', color:C.blue,  bg:C.blueBg   },
-  { label:'Check-in PPT',  icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight  },
+  { label:'Check-in PPT',  icon:'📋', href:'/checkin',             color:C.red,  bg:C.redLight  },
   { label:'Candidatura',   icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg   },
   { label:'Produtividade', icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg   },
 ]
@@ -43,6 +43,7 @@ async function sbQuery(table: string, qs = '') {
   return r.json()
 }
 
+// Auxiliar para datas locais
 function parseLocalDate(str: string) {
   if(!str) return null
   const s = str.split('T')[0]
@@ -67,6 +68,14 @@ export default function HomePage() {
   useEffect(() => { fetchClients() }, [])
   useEffect(() => { fetchSuabase() }, [])
 
+  // Sincroniza o cliente selecionado quando a lista global atualiza
+  useEffect(() => {
+    if (selected) {
+      const updatedSelected = clients.find(c => c.id === selected.id)
+      if (updatedSelected) setSelected(updatedSelected)
+    }
+  }, [clients])
+
   async function fetchClients() {
     const res = await fetch('/api/clients')
     if (res.ok) setClients(await res.json())
@@ -75,7 +84,6 @@ export default function HomePage() {
   async function fetchSuabase() {
     try {
       const hoje = new Date(); hoje.setHours(0,0,0,0)
-      const hojeStr = hoje.toISOString().split('T')[0]
       const semanaStr = new Date(hoje.getTime() - 7*864e5).toISOString().split('T')[0]
 
       const [tarefas, horas] = await Promise.all([
@@ -102,7 +110,7 @@ export default function HomePage() {
     setSaving(true)
     if (editClient) {
       const res = await fetch(`/api/clients/${editClient.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
-      if (res.ok) { const u = await res.json(); setClients(p=>p.map(c=>c.id===u.id?u:c)); setSelected(u) }
+      if (res.ok) { const u = await res.json(); setClients(p=>p.map(c=>c.id===u.id?u:c)) }
     } else {
       const res = await fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
       if (res.ok) { const cr = await res.json(); setClients(p=>[...p,cr]) }
@@ -119,7 +127,7 @@ export default function HomePage() {
 
   async function handleUpdateClient(updated: any) {
     const res = await fetch(`/api/clients/${updated.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated) })
-    if (res.ok) { const u = await res.json(); setClients(p=>p.map(c=>c.id===u.id?u:c)); setSelected(u) }
+    if (res.ok) { const u = await res.json(); setClients(p=>p.map(c=>c.id===u.id?u:c)) }
   }
 
   const filtered = clients.filter(c => {
@@ -134,6 +142,9 @@ export default function HomePage() {
   const atencao  = clients.filter(c=>c.status==='atencao').length
   const churn    = clients.filter(c=>c.status==='churn').length
   const mrrTotal = clients.reduce((s,c)=>s+(Number(c.mrr)||0),0)
+
+  // 🔴 CÁLCULO DA SOMA TOTAL DAS MONETIZAÇÕES EXTRAS DE TODOS OS CLIENTES
+  const totalMonetizado = clients.reduce((acc, c) => acc + (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0), 0)
 
   return (
     <>
@@ -155,13 +166,15 @@ export default function HomePage() {
         ) : (
           <div>
 
-            {/* ── KPI Strip ────────────────────────────────────────────────── */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:20}}>
+            {/* ── KPI Strip (Ajustado para 7 colunas dinâmicas) ────────────────── */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:12,marginBottom:20}}>
               {[
                 { label:'Clientes Ativos',   value:ativos,                color:C.green,  bg:C.greenBg,   icon:'✓' },
                 { label:'Em Atenção',         value:atencao,               color:C.amber,  bg:C.amberBg,   icon:'⚠' },
                 { label:'Churn Risk',         value:churn,                 color:C.orange, bg:C.orangeBg,  icon:'!' },
                 { label:'MRR Total',          value:fmtR(mrrTotal),        color:C.blue,   bg:C.blueBg,    icon:'$' },
+                // 🔴 NOVO CARD DE MONETIZAÇÃO GERAL DA UNIDADE
+                { label:'Monetização Extra',  value:fmtR(totalMonetizado), color:C.blue,   bg:C.blueBg,    icon:'📈' },
                 { label:'Tarefas Hoje',       value:tarefasHoje.length,    color:C.amber,  bg:C.amberBg,   icon:'📅' },
                 { label:'Em Atraso',          value:tarefasAtraso.length,  color:tarefasAtraso.length>0?C.red:C.green, bg:tarefasAtraso.length>0?C.redLight:C.greenBg, icon:'⏰' },
               ].map((k,i)=>(
@@ -174,7 +187,7 @@ export default function HomePage() {
                     <div style={{width:26,height:26,borderRadius:7,background:k.bg,
                       display:'flex',alignItems:'center',justifyContent:'center',fontSize:12}}>{k.icon}</div>
                   </div>
-                  <p style={{color:C.text,fontSize:22,fontWeight:900,margin:0,letterSpacing:'-0.5px'}}>{k.value}</p>
+                  <p style={{color:C.text,fontSize:18,fontWeight:900,margin:0,letterSpacing:'-0.5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{k.value}</p>
                 </div>
               ))}
             </div>
