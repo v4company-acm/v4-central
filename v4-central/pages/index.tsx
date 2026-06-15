@@ -6,7 +6,6 @@ import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
 
-// ── Design Tokens ───────────────────────────────────────────────────────────
 // ── Design Tokens Dinâmicos (Dark/Light Mode) ──
 const C = {
   bg: 'var(--bg-color)',
@@ -117,6 +116,16 @@ export default function HomePage() {
     setSaving(false); setShowForm(false); setEditClient(null)
   }
 
+  // ── FUNÇÃO ADICIONADA AQUI: Responsável por salvar otimizações e afins do ClientDetail no Supabase ──
+  async function handleUpdateClient(updated: any) {
+    const res = await fetch(`/api/clients/${updated.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated) })
+    if (res.ok) { 
+      const u = await res.json(); 
+      setClients(p=>p.map(c=>c.id===u.id?u:c));
+      setSelected(u); // Garante que a tela reflita o dado salvo na hora
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm('Excluir este cliente permanentemente?')) return
     await fetch(`/api/clients/${id}`, { method:'DELETE' })
@@ -154,7 +163,8 @@ export default function HomePage() {
         }
       >
         {selected ? (
-          <ClientDetail client={selected} onUpdate={(updated) => setClients(p => p.map(c => c.id === updated.id ? updated : c))} />
+          {/* ── CHAMADA ATUALIZADA AQUI: Agora usando a função handleUpdateClient ── */}
+          <ClientDetail client={selected} onUpdate={handleUpdateClient} />
         ) : (
           <div style={{maxWidth:1400, margin:'0 auto'}}>
 
