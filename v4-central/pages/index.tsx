@@ -163,7 +163,6 @@ export default function HomePage() {
         }
       >
         {selected ? (
-          {/* ── CHAMADA ATUALIZADA AQUI: Agora usando a função handleUpdateClient ── */}
           <ClientDetail client={selected} onUpdate={handleUpdateClient} />
         ) : (
           <div style={{maxWidth:1400, margin:'0 auto'}}>
