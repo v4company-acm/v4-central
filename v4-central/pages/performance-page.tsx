@@ -184,6 +184,17 @@ export default function PerformancePage() {
   const gapRank = lostRank > 0.2 ? `${pct(lostRank)} das impressões perdidas por qualidade/lance` : null
   const gapBudg = lostBudg > 0.1 ? `${pct(lostBudg)} das impressões perdidas por orçamento` : null
 
+  const presetBtn = (active: boolean): React.CSSProperties => ({
+    padding: '6px 14px', borderRadius: 8, border: `1.5px solid ${active ? '#D32F2F' : '#e5e7eb'}`,
+    background: active ? '#D32F2F' : '#fff', color: active ? '#fff' : '#374151',
+    fontWeight: 600, fontSize: 13, cursor: 'pointer',
+  })
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '10px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+    borderBottom: `2px solid ${active ? '#D32F2F' : 'transparent'}`,
+    color: active ? '#D32F2F' : '#6b7280', background: 'none', border: 'none',
+    borderBottom: `2px solid ${active ? '#D32F2F' : 'transparent'}`,
+  })
   const s: Record<string, React.CSSProperties> = {
     page: { minHeight: '100vh', background: '#f9fafb', fontFamily: "'DM Sans', sans-serif" },
     header: { background: '#111', color: '#fff', padding: '16px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
@@ -191,21 +202,10 @@ export default function PerformancePage() {
     logoMark: { background: '#D32F2F', borderRadius: 6, width: 30, height: 30, display: 'grid', placeItems: 'center' as any, fontSize: 13, fontWeight: 800 },
     inner: { maxWidth: 1200, margin: '0 auto', padding: '28px 24px' },
     controls: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as any, marginBottom: 24 },
-    presetBtn: (active: boolean): React.CSSProperties => ({
-      padding: '6px 14px', borderRadius: 8, border: `1.5px solid ${active ? '#D32F2F' : '#e5e7eb'}`,
-      background: active ? '#D32F2F' : '#fff', color: active ? '#fff' : '#374151',
-      fontWeight: 600, fontSize: 13, cursor: 'pointer',
-    }),
     input: { padding: '6px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 13, background: '#fff' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 },
     card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '20px 24px', marginBottom: 20 },
     tabBar: { display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #e5e7eb', paddingBottom: 0 },
-    tab: (active: boolean): React.CSSProperties => ({
-      padding: '10px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-      borderBottom: `2px solid ${active ? '#D32F2F' : 'transparent'}`,
-      color: active ? '#D32F2F' : '#6b7280', background: 'none', border: 'none',
-      borderBottom: `2px solid ${active ? '#D32F2F' : 'transparent'}`,
-    }),
     th: { padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as any, letterSpacing: '0.06em', textAlign: 'left' as any, borderBottom: '1px solid #f3f4f6' },
     td: { padding: '10px 12px', fontSize: 13, borderBottom: '1px solid #f9fafb', color: '#111' },
   }
@@ -226,7 +226,7 @@ export default function PerformancePage() {
           {/* Controls */}
           <div style={s.controls}>
             {PRESETS.map(p => (
-              <button key={p.days} style={s.presetBtn(preset === p.days)} onClick={() => applyPreset(p.days)}>{p.label}</button>
+              <button key={p.days} style={presetBtn(preset === p.days)} onClick={() => applyPreset(p.days)}>{p.label}</button>
             ))}
             <input type="date" style={s.input} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPreset(0) }} />
             <span style={{ color: '#9ca3af', fontSize: 13 }}>até</span>
@@ -258,7 +258,7 @@ export default function PerformancePage() {
           <div style={s.card}>
             <div style={s.tabBar}>
               {(['funil', 'impressao', 'debug'] as const).map(t => (
-                <button key={t} style={s.tab(tab === t)} onClick={() => setTab(t)}>
+                <button key={t} style={tabStyle(tab === t)} onClick={() => setTab(t)}>
                   {t === 'funil' ? '🎯 Funil & Gaps' : t === 'impressao' ? '📊 Parcela de Impressão' : '🔍 Debug Diário'}
                 </button>
               ))}
