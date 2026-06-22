@@ -260,9 +260,9 @@ export default function PerformancePage() {
               { label: 'CPA', val: conv ? brl(cpa) : '—', d: cCpa ? delta(cpa, cCpa) : null, s: null, inv: true },
             ].map(item => (
               <div key={item.label} style={{
-                background: '#fff', border: `1px solid ${item.s ? borders[item.s] : '#e5e7eb'}`,
-                borderRadius: 10, padding: '12px 16px',
                 background: item.s ? bgs[item.s] : '#fff',
+                border: `1px solid ${item.s ? borders[item.s] : '#e5e7eb'}`,
+                borderRadius: 10, padding: '12px 16px',
               }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }}>{item.label}</p>
                 <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: item.s ? colors[item.s] : '#111' }}>
