@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     'impressions',
     'clicks',
     'ctr',
-    'spend',
+    'Spend',
     'conversions',
     'conversion_rate',
     'cost_per_conversion',
