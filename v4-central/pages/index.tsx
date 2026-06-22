@@ -34,7 +34,7 @@ const TOOLS = [
   { label:'Check-in PPT',  icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight },
   { label:'Candidatura',   icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
   { label:'Produtividade', icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
-  { label:'Performance',   icon:'📈', href:'/performance',         color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
+  { label:'Performance',   icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
 ]
 
 async function sbQuery(table: string, qs = '') {
