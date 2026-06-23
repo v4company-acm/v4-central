@@ -17,6 +17,22 @@ export async function readJSON(key: string): Promise<any[]> {
   return []
 }
 
-export async function writeJSON(key: string, data: any): Promise<void> {
-  // implementar conforme necessidade
+export async function writeJSON(key: string, data: any[]): Promise<void> {
+  if (key === 'clients') {
+    // Busca IDs existentes no banco
+    const { data: existing } = await supabase.from('clients').select('id')
+    const existingIds = new Set((existing || []).map((r: any) => r.id))
+    const incomingIds = new Set(data.map((r: any) => r.id))
+
+    // DELETE — removidos do array
+    const toDelete = [...existingIds].filter(id => !incomingIds.has(id))
+    if (toDelete.length > 0) {
+      await supabase.from('clients').delete().in('id', toDelete)
+    }
+
+    // UPSERT — insere ou atualiza
+    if (data.length > 0) {
+      await supabase.from('clients').upsert(data, { onConflict: 'id' })
+    }
+  }
 }
