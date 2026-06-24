@@ -255,7 +255,7 @@ export default function HomePage() {
               </div>
               <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap'}}>
                 {clientesComGA.slice(0,3).map(c => (
-                  <a key={c.id} href={`/performance?cliente_id=${c.id}`}
+                  <a key={c.id} href={`/performance-page?cliente_id=${c.id}`}
                     style={{
                       padding:'8px 16px', borderRadius:8,
                       background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)',
@@ -268,7 +268,7 @@ export default function HomePage() {
                     📊 {c.nome}
                   </a>
                 ))}
-                <a href="/performance"
+                <a href="/performance-page"
                   style={{
                     padding:'8px 20px', borderRadius:8,
                     background:'#E8002D', border:'none',
