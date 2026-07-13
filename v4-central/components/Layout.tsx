@@ -35,8 +35,11 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
       {/* ── SIDEBAR (Menu Lateral) ── */}
       <aside className="sidebar">
         <div className="logo">
-          <div className="logo-dot" />
-          V4 Central de Clientes
+          <div className="logo-badge">V4</div>
+          <div className="logo-text">
+            <div className="logo-title">Central de Clientes</div>
+            <div className="logo-subtitle">V4 Company</div>
+          </div>
         </div>
 
         <div className="sb-section">Menu Principal</div>
@@ -77,7 +80,7 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
         
         {/* Topbar (Cabeçalho) */}
         <header className="topbar">
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)' }}>
+          <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-main)' }}>
             {title}
           </div>
           

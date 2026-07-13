@@ -244,9 +244,9 @@ export default function HomePage() {
             </div>
 
             {/* ── 3. CARD DE PERFORMANCE ANALYTICS ── */}
-            <div style={{background:'linear-gradient(135deg, #111 0%, #1e1e2e 100%)', borderRadius:12, padding:'20px 24px', marginBottom:24, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
+            <div style={{background:'var(--brand-gradient)', borderRadius:12, padding:'20px 24px', marginBottom:24, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
               <div style={{display:'flex', alignItems:'center', gap:16}}>
-                <div style={{width:44, height:44, borderRadius:10, background:'rgba(232,0,45,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22}}>📈</div>
+                <div style={{width:44, height:44, borderRadius:10, background:'rgba(251,46,10,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22}}>📈</div>
                 <div>
                   <p style={{margin:0, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'0.1em'}}>Módulo Analytics</p>
                   <p style={{margin:'2px 0 0', fontSize:16, fontWeight:800, color:'#fff'}}>Performance de Tráfego</p>
@@ -262,7 +262,7 @@ export default function HomePage() {
                       color:'#fff', fontSize:12, fontWeight:600, textDecoration:'none',
                       transition:'all 0.2s', display:'flex', alignItems:'center', gap:6
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background='rgba(232,0,45,0.2)'; e.currentTarget.style.borderColor='rgba(232,0,45,0.4)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background='rgba(251,46,10,0.2)'; e.currentTarget.style.borderColor='rgba(251,46,10,0.4)' }}
                     onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.12)' }}
                   >
                     📊 {c.nome}
