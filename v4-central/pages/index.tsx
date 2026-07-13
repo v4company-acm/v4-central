@@ -14,7 +14,7 @@ const C = {
   text: 'var(--text-main)',
   text2: 'var(--text-secondary)',
   text3: 'var(--text-muted)',
-  red: '#E8002D', redLight: 'rgba(232, 0, 45, 0.1)', redMid: 'rgba(232, 0, 45, 0.2)',
+  red: '#FB2E0A', redLight: 'rgba(251, 46, 10, 0.1)', redMid: 'rgba(251, 46, 10, 0.2)',
   green: '#16A34A', greenBg: 'rgba(22, 163, 74, 0.1)',
   orange: '#EA580C', orangeBg: 'rgba(234, 88, 12, 0.1)',
   amber: '#D97706', amberBg: 'rgba(217, 119, 6, 0.1)',
@@ -148,7 +148,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Head><title>Central de Clientes — ACM&Co</title></Head>
+      <Head><title>Central de Clientes — V4</title></Head>
       <Layout
         title={selected ? selected.nome : 'Dashboard de Unidade'}
         topbarRight={
@@ -271,12 +271,12 @@ export default function HomePage() {
                 <a href="/performance-page"
                   style={{
                     padding:'8px 20px', borderRadius:8,
-                    background:'#E8002D', border:'none',
+                    background:'#FB2E0A', border:'none',
                     color:'#fff', fontSize:12, fontWeight:700, textDecoration:'none',
                     transition:'all 0.2s'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background='#c0001f'}
-                  onMouseLeave={e => e.currentTarget.style.background='#E8002D'}
+                  onMouseEnter={e => e.currentTarget.style.background='#D61A0E'}
+                  onMouseLeave={e => e.currentTarget.style.background='#FB2E0A'}
                 >
                   Abrir Analytics →
                 </a>

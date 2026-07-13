@@ -140,15 +140,15 @@ export default function PerformancePage() {
   // ── Estilos ──
   const btnS = (active: boolean): React.CSSProperties => ({
     padding: '5px 14px', borderRadius: 8,
-    border: `1.5px solid ${active ? '#D32F2F' : '#e5e7eb'}`,
-    background: active ? '#D32F2F' : '#fff',
+    border: `1.5px solid ${active ? '#FB2E0A' : '#e5e7eb'}`,
+    background: active ? '#FB2E0A' : '#fff',
     color: active ? '#fff' : '#374151',
     fontWeight: 700, fontSize: 12, cursor: 'pointer',
   })
   const tabS = (active: boolean): React.CSSProperties => ({
     padding: '10px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-    color: active ? '#D32F2F' : '#6b7280', background: 'none', border: 'none',
-    borderBottom: `2px solid ${active ? '#D32F2F' : 'transparent'}`,
+    color: active ? '#FB2E0A' : '#6b7280', background: 'none', border: 'none',
+    borderBottom: `2px solid ${active ? '#FB2E0A' : 'transparent'}`,
   })
   const th: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'left', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }
   const td: React.CSSProperties = { padding: '9px 12px', fontSize: 12, borderBottom: '1px solid #f9fafb', color: '#111' }
@@ -173,7 +173,7 @@ export default function PerformancePage() {
   }
 
   // Mini spark SVG
-  function Spark({ vals, color = '#D32F2F' }: { vals: number[]; color?: string }) {
+  function Spark({ vals, color = '#FB2E0A' }: { vals: number[]; color?: string }) {
     if (vals.length < 2) return null
     const max = Math.max(...vals) || 1
     const W = 100, H = 28
@@ -184,12 +184,12 @@ export default function PerformancePage() {
   return (
     <>
       <Head><title>Performance | {CLIENTES.find(c => c.id === clienteId)?.nome}</title></Head>
-      <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: "'IBM Plex Sans', sans-serif" }}>
 
         {/* Header */}
         <div style={{ background: '#111', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800, fontSize: 14 }}>
-            <div style={{ background: '#D32F2F', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>V4</div>
+            <div style={{ background: '#FB2E0A', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>V4</div>
             Performance Analytics
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -262,7 +262,7 @@ export default function PerformancePage() {
                   <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 20px' }}>Onde está vazando o volume?</p>
 
                   {[
-                    { label: 'Impressões', val: imp, pctVal: 100, note: `IS: ${pct(impShare)} — potencial: ${fmt(imp / (impShare || 1))}`, color: '#D32F2F' },
+                    { label: 'Impressões', val: imp, pctVal: 100, note: `IS: ${pct(impShare)} — potencial: ${fmt(imp / (impShare || 1))}`, color: '#FB2E0A' },
                     { label: 'Cliques', val: clk, pctVal: imp ? (clk / imp) * 100 : 0, note: `CTR ${pct(ctrV)} (bench ${pct(BENCH.ctr)}) — drop-off: ${fmt(imp - clk)} impressões sem clique`, color: '#ef4444' },
                     { label: 'Conversões', val: conv, pctVal: imp ? (conv / imp) * 100 : 0, note: `CVR ${pct(cvr)} (bench ${pct(BENCH.cvr)}) — drop-off: ${fmt(clk - conv)} cliques sem converter`, color: '#b91c1c' },
                   ].map((item, i) => (
@@ -398,7 +398,7 @@ export default function PerformancePage() {
                 <div style={{ marginBottom: 20 }}>
                   <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Distribuição de impressões disponíveis</p>
                   <div style={{ display: 'flex', height: 32, borderRadius: 8, overflow: 'hidden', gap: 2 }}>
-                    <div style={{ width: `${impShare * 100}%`, background: '#D32F2F', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700 }}>
+                    <div style={{ width: `${impShare * 100}%`, background: '#FB2E0A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700 }}>
                       {impShare > 0.08 ? `✓ ${pct(impShare)}` : ''}
                     </div>
                     <div style={{ width: `${lostRank * 100}%`, background: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700 }}>

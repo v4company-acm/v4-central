@@ -29,14 +29,14 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
   return (
     <div className="layout">
       <Head>
-        <title>{title} — ACM&Co</title>
+        <title>{title} — V4 Central de Clientes</title>
       </Head>
 
       {/* ── SIDEBAR (Menu Lateral) ── */}
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-dot" />
-          ACM&Co Central
+          V4 Central de Clientes
         </div>
 
         <div className="sb-section">Menu Principal</div>
