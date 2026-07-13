@@ -28,8 +28,8 @@ export default function LoginPage() {
       <div className="login-page">
         <div className="login-card">
           <div className="login-logo">
-            <h1>V4 <span style={{ color: 'var(--red)' }}>●</span></h1>
-            <p>Central de Clientes</p>
+            <div className="logo-badge">V4</div>
+            <h1>Central de Clientes</h1>
           </div>
           {error && <div className="login-error">{error}</div>}
           <form onSubmit={handleSubmit}>
