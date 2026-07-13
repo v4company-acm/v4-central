@@ -63,7 +63,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
     const fim = new Date(c.fimContrato)
     const diffTime = fim.getTime() - hoje.getTime()
     diasVencimento = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    if (diasVencimento < 30) corVencimento = '#E8002D' // Vermelho
+    if (diasVencimento < 30) corVencimento = '#FB2E0A' // Vermelho
     else if (diasVencimento < 60) corVencimento = '#D97706' // Amarelo
     else corVencimento = '#16A34A' // Verde
   }
@@ -85,7 +85,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
         <div style={{display:'flex', flexDirection:'column', gap:4}}>
           <span style={{fontSize:11, fontWeight:700, color:'#9A9A9A', textTransform:'uppercase', letterSpacing:1}}>Status do Projeto</span>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <div style={{width:10, height:10, borderRadius:'50%', background:c.status==='ativo'?'#16A34A':c.status==='atencao'?'#D97706':c.status==='churn'?'#E8002D':'#9A9A9A'}} />
+            <div style={{width:10, height:10, borderRadius:'50%', background:c.status==='ativo'?'#16A34A':c.status==='atencao'?'#D97706':c.status==='churn'?'#FB2E0A':'#9A9A9A'}} />
             <span style={{fontSize:16, fontWeight:800, color:'#111', textTransform:'capitalize'}}>{c.status || 'Não definido'}</span>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
             </div>
           </div>
           {c.descricao&&c.descricao!=='-'&&<div style={{marginTop:24, background:'#FAFAFA', padding:16, borderRadius:8, borderLeft:'4px solid #D4D1CC'}}><strong style={{display:'block', marginBottom:4}}>Sobre o projeto:</strong>{c.descricao}</div>}
-          {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'#FFF0F2', padding:16, borderRadius:8, borderLeft:'4px solid #E8002D'}}><strong style={{display:'block', marginBottom:4, color:'#E8002D'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
+          {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'#FFF0F2', padding:16, borderRadius:8, borderLeft:'4px solid #FB2E0A'}}><strong style={{display:'block', marginBottom:4, color:'#FB2E0A'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
         </>}
 
         {/* ABA: HISTÓRICO (TIMELINE UNIFICADA) */}
@@ -194,7 +194,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                           </span>
                           <span style={{fontSize:12, color:'#9A9A9A', fontWeight:600}}>{fmtDate(item.data)}</span>
                         </div>
-                        <button style={{background:'none', border:'none', color:'#E8002D', cursor:'pointer', fontSize:14}} onClick={()=>removeItem(item._type==='otimizacao'?'otimizacoes':item._type==='reuniao'?'reunioes':'anotacoes', item._idx)}>×</button>
+                        <button style={{background:'none', border:'none', color:'#FB2E0A', cursor:'pointer', fontSize:14}} onClick={()=>removeItem(item._type==='otimizacao'?'otimizacoes':item._type==='reuniao'?'reunioes':'anotacoes', item._idx)}>×</button>
                       </div>
                       
                       <div style={{fontSize:15, fontWeight:700, color:'#111', marginBottom:4}}>{item.titulo || item.texto}</div>
@@ -258,7 +258,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                     const isTop = parseFloat(m.roas||0) === bestRoas && bestRoas && bestRoas > 0
                     return (
                       <tr key={i} style={{borderBottom:'1px solid #E8E6E3',background:isTop?'#FEF2F2':'transparent'}}>
-                        <td style={{padding:'12px',fontWeight:600}}>{fmtDate(m.data)} {isTop && <span style={{background:'#E8002D',color:'#fff',fontSize:10,padding:'2px 6px',borderRadius:4,marginLeft:6}}>Recorde</span>}</td>
+                        <td style={{padding:'12px',fontWeight:600}}>{fmtDate(m.data)} {isTop && <span style={{background:'#FB2E0A',color:'#fff',fontSize:10,padding:'2px 6px',borderRadius:4,marginLeft:6}}>Recorde</span>}</td>
                         <td style={{padding:'12px',fontWeight:700}}>{m.roas||'—'}</td>
                         <td style={{padding:'12px'}}>{m.roi?m.roi+'%':'—'}</td>
                         <td style={{padding:'12px'}}>{m.cpl?'R$'+m.cpl:'—'}</td>
@@ -292,7 +292,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                   </div>
                   <div style={{display:'flex', alignItems:'center', gap:16}}>
                     <span style={{fontSize:18, fontWeight:800, color:'#111'}}>{fmtR(m.valor)}</span>
-                    <button style={{background:'#FFF0F2', border:'1px solid #FFCDD5', color:'#E8002D', width:28, height:28, borderRadius:6, cursor:'pointer', fontWeight:700}} onClick={()=>removeItem('monetizacoes',i)}>×</button>
+                    <button style={{background:'#FFF0F2', border:'1px solid #FFCDD5', color:'#FB2E0A', width:28, height:28, borderRadius:6, cursor:'pointer', fontWeight:700}} onClick={()=>removeItem('monetizacoes',i)}>×</button>
                   </div>
                 </div>
               ))}
@@ -321,7 +321,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
                     {cr.descricao&&<div style={{fontSize:12,color:'#5A5A5A',marginBottom:12,lineHeight:1.4}}>{cr.descricao}</div>}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       {cr.url&&<a href={cr.url} target="_blank" rel="noreferrer" style={{fontSize:12,color:'#2563EB',fontWeight:600,textDecoration:'none'}}>Acessar Original ↗</a>}
-                      <button style={{border:'none',background:'none',color:'#E8002D',cursor:'pointer',fontSize:12,fontWeight:600}} onClick={()=>removeItem('criativos',i)}>Apagar</button>
+                      <button style={{border:'none',background:'none',color:'#FB2E0A',cursor:'pointer',fontSize:12,fontWeight:600}} onClick={()=>removeItem('criativos',i)}>Apagar</button>
                     </div>
                   </div>
                 </div>
@@ -364,7 +364,7 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
               {(c.arquivos||[]).map((a:any,i:number)=>(
                 <div key={i} style={{background:'#FAFAFA', border:'1px solid #E8E6E3', borderRadius:8, padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                   <div style={{fontWeight:600}}>{a.titulo} {a.url&&<a href={a.url} target="_blank" rel="noreferrer" style={{marginLeft:12, fontSize:12, color:'#2563EB', textDecoration:'none', fontWeight:400}}>{a.url}</a>}</div>
-                  <button style={{background:'none', border:'none', color:'#E8002D', cursor:'pointer', fontSize:14}} onClick={()=>removeItem('arquivos',i)}>×</button>
+                  <button style={{background:'none', border:'none', color:'#FB2E0A', cursor:'pointer', fontSize:14}} onClick={()=>removeItem('arquivos',i)}>×</button>
                 </div>
               ))}
             </div>

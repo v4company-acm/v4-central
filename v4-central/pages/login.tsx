@@ -28,7 +28,7 @@ export default function LoginPage() {
       <div className="login-page">
         <div className="login-card">
           <div className="login-logo">
-            <h1>V4 <span style={{ color: '#D72B2B' }}>●</span></h1>
+            <h1>V4 <span style={{ color: 'var(--red)' }}>●</span></h1>
             <p>Central de Clientes</p>
           </div>
           {error && <div className="login-error">{error}</div>}

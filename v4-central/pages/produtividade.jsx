@@ -25,7 +25,7 @@ const C = {
   text: 'var(--text-main)',
   text2: 'var(--text-secondary)',
   text3: 'var(--text-muted)',
-  red: '#E8002D', redLight: 'rgba(232, 0, 45, 0.1)', redMid: 'rgba(232, 0, 45, 0.2)',
+  red: '#FB2E0A', redLight: 'rgba(251, 46, 10, 0.1)', redMid: 'rgba(251, 46, 10, 0.2)',
   green: '#16A34A', greenBg: 'rgba(22, 163, 74, 0.1)',
   orange: '#EA580C', orangeBg: 'rgba(234, 88, 12, 0.1)',
   amber: '#D97706', amberBg: 'rgba(217, 119, 6, 0.1)',
@@ -1132,7 +1132,7 @@ export default function Produtividade() {
           <div style={{width:34,height:34,background:C.red,borderRadius:8,display:"flex",
             alignItems:"center",justifyContent:"center",color:"#fff",fontSize:13,fontWeight:900}}>V4</div>
           <div>
-            <p style={{color:C.text3,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",margin:0}}>ACM&Co · Produtividade</p>
+            <p style={{color:C.text3,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",margin:0}}>V4 · Produtividade</p>
             <p style={{color:C.text,fontSize:14,fontWeight:800,margin:0}}>
               {NAV.find(n=>n.id===page)?.label}
             </p>

@@ -70,7 +70,7 @@ function KpiCard({ label, value, delta: d, color, bar }: {
       {bar !== undefined && (
         <div style={{
           position: 'absolute', bottom: 0, left: 0, height: 2,
-          width: `${Math.min(100, bar)}%`, background: color || '#D72B2B',
+          width: `${Math.min(100, bar)}%`, background: color || '#FB2E0A',
           transition: 'width .9s cubic-bezier(.16,1,.3,1)'
         }} />
       )}
@@ -178,7 +178,7 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
               padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
               cursor: 'pointer', border: period === p.v ? 'none' : '1px solid #ffffff18',
               color: period === p.v ? '#fff' : '#8b8fa8',
-              background: period === p.v ? '#D72B2B' : 'transparent', fontFamily: 'inherit'
+              background: period === p.v ? '#FB2E0A' : 'transparent', fontFamily: 'inherit'
             }}>{p.l}</button>
           ))}
         </div>
@@ -241,10 +241,10 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
           {/* Criativo campeão */}
           {m.champion && (
             <div style={{
-              background: 'linear-gradient(135deg,#D72B2B0a,#8b5cf60a)',
-              border: '1px solid #D72B2B22', borderRadius: 10, padding: 14, marginBottom: 7
+              background: 'linear-gradient(135deg,#FB2E0A0a,#8b5cf60a)',
+              border: '1px solid #FB2E0A22', borderRadius: 10, padding: 14, marginBottom: 7
             }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#D72B2B22', color: '#ff4444', fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 10, marginBottom: 8, letterSpacing: '.08em' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#FB2E0A22', color: '#ff4444', fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 10, marginBottom: 8, letterSpacing: '.08em' }}>
                 ★ CRIATIVO CAMPEÃO · MENOR CPA
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, lineHeight: 1.3 }}>{m.champion.name}</div>
@@ -296,7 +296,7 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
                     ].map(b => {
                       const max = m.video!.p25 || 1
                       return (
-                        <div key={b.k} style={{ flex: 1, height: `${b.v / max * 100}%`, background: `#D72B2B${b.op}`, borderRadius: '3px 3px 0 0', minHeight: 4 }} />
+                        <div key={b.k} style={{ flex: 1, height: `${b.v / max * 100}%`, background: `#FB2E0A${b.op}`, borderRadius: '3px 3px 0 0', minHeight: 4 }} />
                       )
                     })}
                   </div>
@@ -342,7 +342,7 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
           { l: 'Melhor ROI', v: bestRoi ? bestRoi + '%' : '—', c: '#1db97a' },
           { l: 'Recorde vendas', v: bestVendas ? fmtN(bestVendas) : '—', c: '#f0f1f5' },
         ].map(k => (
-          <div key={k.l} style={{ ...card, borderTop: '2px solid #D72B2B' }}>
+          <div key={k.l} style={{ ...card, borderTop: '2px solid #FB2E0A' }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.1em', color: '#4a4e63', textTransform: 'uppercase', marginBottom: 6 }}>{k.l}</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 500, color: k.c }}>{k.v}</div>
           </div>
@@ -367,7 +367,7 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
                 const tc = parseInt(d.leads) > 0 ? (parseInt(d.vendas) / parseInt(d.leads) * 100).toFixed(0) + '%' : '—'
                 const isTop = r === bestRoas && r > 0
                 return (
-                  <tr key={i} style={{ borderBottom: '1px solid #ffffff0d', background: isTop ? '#D72B2B08' : 'transparent' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid #ffffff0d', background: isTop ? '#FB2E0A08' : 'transparent' }}>
                     <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: '#f0f1f5', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmtDate(d.data)}</td>
                     <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: '#8b8fa8' }}>{fmtR(parseFloat(d.invest))}</td>
                     <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: r > 4 ? '#1db97a' : r > 2 ? '#f0f1f5' : '#ff4444' }}>{r ? r.toFixed(1) + 'x' : '—'}</td>
@@ -378,7 +378,7 @@ export default function MetricsDashboard({ historico, clienteNome }: Props) {
                     <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: parseFloat(d.google?.imp_share || '0') > 70 ? '#1db97a' : '#8b8fa8' }}>{d.google?.imp_share ? d.google.imp_share + '%' : '—'}</td>
                     <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: '#8b8fa8' }}>{d.meta?.frequency ? d.meta.frequency.toFixed(2) + 'x' : '—'}</td>
                     <td style={{ padding: '8px 11px' }}>
-                      {isTop && <span style={{ background: '#D72B2B22', color: '#ff4444', fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 8 }}>★ top</span>}
+                      {isTop && <span style={{ background: '#FB2E0A22', color: '#ff4444', fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 8 }}>★ top</span>}
                     </td>
                   </tr>
                 )
