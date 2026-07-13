@@ -1,5 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import { signOut } from 'next-auth/react' // Já deixei pronto pro seu NextAuth
 
 interface LayoutProps {
@@ -8,8 +9,15 @@ interface LayoutProps {
   topbarRight?: ReactNode;
 }
 
+const NAV_LINKS = [
+  { href: '/', label: 'Dashboard' },
+  { href: '/checkin', label: 'Check-in PPT' },
+  { href: '/produtividade', label: 'Produtividade' },
+]
+
 export default function Layout({ children, title = 'Central', topbarRight }: LayoutProps) {
   const [theme, setTheme] = useState('light')
+  const router = useRouter()
 
   // Ao carregar a página, verifica se o usuário já tinha salvo o Dark Mode
   useEffect(() => {
@@ -32,9 +40,9 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
         <title>{title} — V4 Central de Clientes</title>
       </Head>
 
-      {/* ── SIDEBAR (Menu Lateral) ── */}
-      <aside className="sidebar">
-        <div className="logo">
+      {/* ── NAV DE TOPO (Identidade + Navegação) ── */}
+      <header className="topnav">
+        <div className="topnav__brand">
           <div className="logo-badge">V4</div>
           <div className="logo-text">
             <div className="logo-title">Central de Clientes</div>
@@ -42,52 +50,39 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
           </div>
         </div>
 
-        <div className="sb-section">Menu Principal</div>
-        
-        <a href="/" className="sb-item">
-          <div className="sb-dot" style={{background: 'var(--red)'}} />
-          Dashboard
-        </a>
-        
-        <a href="/checkin" className="sb-item">
-          <div className="sb-dot" style={{background: 'var(--text-muted)'}} />
-          Check-in PPT
-        </a>
-        
-        <a href="/produtividade" className="sb-item">
-          <div className="sb-dot" style={{background: 'var(--text-muted)'}} />
-          Produtividade
-        </a>
+        <nav className="topnav__links">
+          {NAV_LINKS.map(link => (
+            <a
+              key={link.href}
+              href={link.href}
+              className={`topnav__link${router.pathname === link.href ? ' active' : ''}`}
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
 
-        {/* Rodapé da Sidebar */}
-        <div className="sb-footer">
-          <div className="sb-user">
-            Acesso
-            <strong>Equipe Interna</strong>
-          </div>
-          <button 
-            onClick={() => signOut({ callbackUrl: '/login' })} 
-            className="btn btn-ghost btn-sm" 
-            style={{ width: '100%', justifyContent: 'flex-start', color: 'var(--text-secondary)' }}
-          >
-            Sair / Logout
+        <div className="topnav__user">
+          <span className="topnav__user-label">Equipe Interna</span>
+          <button onClick={() => signOut({ callbackUrl: '/login' })} className="topnav__logout">
+            Sair
           </button>
         </div>
-      </aside>
+      </header>
 
       {/* ── ÁREA PRINCIPAL ── */}
       <div className="main">
-        
-        {/* Topbar (Cabeçalho) */}
+
+        {/* Topbar (Cabeçalho da página) */}
         <header className="topbar">
           <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-main)' }}>
             {title}
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            
+
             {/* BOTÃO DE DARK MODE ☀️/🌙 */}
-            <button 
+            <button
               onClick={toggleTheme}
               title={theme === 'light' ? 'Ativar Modo Escuro' : 'Ativar Modo Claro'}
               style={{
@@ -109,12 +104,12 @@ export default function Layout({ children, title = 'Central', topbarRight }: Lay
             >
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
-            
+
             {/* Botões extras que vêm da página (ex: "Novo Cliente", "Voltar") */}
             {topbarRight}
           </div>
         </header>
-        
+
         {/* Conteúdo Dinâmico da Página */}
         <main className="content">
           {children}

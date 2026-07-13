@@ -290,57 +290,61 @@ export default function HomePage() {
                 <div style={{color:C.text2, fontWeight:600}}>Nenhum cliente encontrado com os filtros atuais.</div>
               </div>
             ) : (
-              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:16}}>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(380px, 1fr))', gap:16}}>
                 {filtered.map((c) => {
                   const [bg, fg] = COLORS[clients.indexOf(c) % COLORS.length].split('|')
                   const ltvExtra = (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
                   const isExpiring = c.fimContrato && new Date(c.fimContrato).getTime() - new Date().getTime() < 30 * 864e5
+                  const statusColor = c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber
 
                   return (
                     <div key={c.id} onClick={() => setSelected(c)} style={{
+                      display:'grid', gridTemplateColumns:'1fr auto',
                       background:C.card, borderRadius:12, border:`1px solid ${C.border}`,
-                      padding:20, cursor:'pointer', transition:'all 0.2s', position:'relative', overflow:'hidden'
+                      cursor:'pointer', transition:'all 0.2s', position:'relative', overflow:'hidden'
                     }}
                       onMouseEnter={e=>{e.currentTarget.style.borderColor=C.red; e.currentTarget.style.transform='translateY(-2px)'}}
                       onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform='translateY(0)'}}
                     >
                       {isExpiring && (
-                        <div style={{position:'absolute', top:12, right:12, background:C.red, color:'#fff', fontSize:9, fontWeight:900, padding:'3px 8px', borderRadius:20, letterSpacing:0.5}}>
+                        <div style={{position:'absolute', top:8, left:8, background:C.red, color:'#fff', fontSize:9, fontWeight:900, padding:'3px 8px', borderRadius:20, letterSpacing:0.5}}>
                           CONTRATO VENCENDO
                         </div>
                       )}
 
-                      <div style={{display:'flex', alignItems:'center', gap:14, marginBottom:16}}>
-                        <div style={{width:48, height:48, borderRadius:12, background:bg, color:fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800}}>
-                          {ini(c.nome)}
+                      {/* ── ZONA ESQUERDA (narrativa) ── */}
+                      <div style={{padding:20, minWidth:0}}>
+                        <div style={{fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:10}}>
+                          {c.cohort || 'Sem Cohort'}
                         </div>
-                        <div style={{minWidth:0}}>
-                          <div style={{fontWeight:800, fontSize:15, color:C.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{c.nome}</div>
-                          <div style={{fontSize:11, color:C.text3, fontWeight:600}}>{c.cohort || 'Sem Cohort'}</div>
+                        <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:14}}>
+                          <div style={{width:40, height:40, borderRadius:10, background:bg, color:fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, flexShrink:0}}>
+                            {ini(c.nome)}
+                          </div>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontWeight:800, fontSize:15, color:C.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{c.nome}</div>
+                            <div style={{fontSize:11, fontWeight:700, color:statusColor}}>{badgeLbl(c.status).toUpperCase()}</div>
+                          </div>
+                        </div>
+                        <div style={{display:'flex', flexDirection:'column', gap:3}}>
+                          <span style={{fontSize:10, color:C.text3, fontWeight:600}}>Última atividade: <span style={{color:C.text2, fontWeight:700}}>{getLastActivity(c)}</span></span>
+                          <span style={{fontSize:10, color:C.text3, fontWeight:600}}>{c.gestor || c.account || 'Sem Gestor'}</span>
                         </div>
                       </div>
 
-                      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16, background:'#F8F9FA', padding:10, borderRadius:8}}>
-                        <div>
-                          <div style={{fontSize:9, color:C.text3, fontWeight:700, textTransform:'uppercase'}}>MRR</div>
-                          <div style={{fontSize:13, fontWeight:800, color:C.blue}}>{fmtR(c.mrr || 0)}</div>
-                        </div>
-                        <div>
-                          <div style={{fontSize:9, color:C.text3, fontWeight:700, textTransform:'uppercase'}}>LTV Extra</div>
-                          <div style={{fontSize:13, fontWeight:800, color:C.green}}>{fmtR(ltvExtra)}</div>
-                        </div>
-                      </div>
-
-                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <div style={{display:'flex', flexDirection:'column'}}>
-                          <span style={{fontSize:10, color:C.text3, fontWeight:600}}>Última atividade:</span>
-                          <span style={{fontSize:11, fontWeight:700, color:C.text2}}>{getLastActivity(c)}</span>
+                      {/* ── ZONA DIREITA (evidência / dado em destaque) ── */}
+                      <div style={{
+                        width:140, flexShrink:0, padding:'20px 16px',
+                        background:C.redLight, borderLeft:`1px solid ${C.border}`,
+                        display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'flex-end', gap:12
+                      }}>
+                        <div style={{textAlign:'right'}}>
+                          <div style={{fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:2}}>MRR</div>
+                          <div style={{fontSize:18, fontWeight:900, color:C.text}}>{fmtR(c.mrr || 0)}</div>
                         </div>
                         <div style={{textAlign:'right'}}>
-                          <div style={{fontSize:10, color:C.text3, fontWeight:600}}>{c.gestor || c.account || 'Sem Gestor'}</div>
-                          <div style={{fontSize:10, fontWeight:800, color: c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber}}>
-                            {badgeLbl(c.status).toUpperCase()}
-                          </div>
+                          <div style={{fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:2}}>LTV Extra</div>
+                          <div style={{fontSize:13, fontWeight:800, color:C.green}}>{fmtR(ltvExtra)}</div>
                         </div>
                       </div>
                     </div>
