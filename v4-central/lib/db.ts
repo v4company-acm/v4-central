@@ -44,6 +44,7 @@ function toRow(c: any) {
     arquivos:          c.arquivos      ?? [],
     metricas:          c.metricas      ?? {},
     metricas_historico: c.metricasHistorico ?? [],
+    roi_roas_checks:   c.roiRoasChecks ?? [],
   }
 }
 
@@ -86,6 +87,7 @@ function fromRow(r: any) {
     arquivos:          r.arquivos          ?? [],
     metricas:          r.metricas          ?? {},
     metricasHistorico: r.metricas_historico ?? [],
+    roiRoasChecks:     r.roi_roas_checks    ?? [],
   }
 }
 

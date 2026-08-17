@@ -5,6 +5,7 @@ import Head from 'next/head'
 import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
+import { roiRoasMeta, currentRoiCheck, suggestRoiRoasStatus } from '../lib/roiRoas'
 
 const C = {
   bg: 'var(--bg-color)',
@@ -30,11 +31,13 @@ function badgeLbl(s: string) { return {ativo:'Ativo',atencao:'Em atenção',chur
 function fmtR(v: number) { return `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}` }
 
 const TOOLS = [
-  { label:'Ekyte',         icon:'🎯', href:'https://app.ekyte.com', color:C.blue,  bg:C.blueBg  },
-  { label:'Check-in PPT',  icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight },
-  { label:'Candidatura',   icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
-  { label:'Produtividade', icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
-  { label:'Performance',   icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
+  { label:'Ekyte',            icon:'🎯', href:'https://app.ekyte.com', color:C.blue,  bg:C.blueBg  },
+  { label:'Check-in PPT',     icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight },
+  { label:'Candidatura',      icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
+  { label:'Produtividade',    icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
+  { label:'Performance',      icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
+  { label:'Gestão de Projetos', icon:'🗂', href:'https://docs.google.com/spreadsheets/d/1NgADoUY7r9RZyhnfXdRYcHbaPWfWYTp_AAYA9j3nnzM/edit', color:'#0F6E56', bg:'#E1F5EE' },
+  { label:'Account Plan',     icon:'📑', href:'https://docs.google.com/spreadsheets/d/1qhy14Vhjifbyhgt1hAH_NLJ-FykZ95sr7nSJMUOBk68/edit', color:'#854F0B', bg:'#FAEEDA' },
 ]
 
 async function sbQuery(table: string, qs = '') {
@@ -68,9 +71,15 @@ function getLastActivity(c: any) {
   return `Há ${diff} dias`
 }
 
+function getRoiStatusKey(c: any) {
+  const check = currentRoiCheck(c.roiRoasChecks)
+  return check?.status || suggestRoiRoasStatus(c.metricasHistorico).status
+}
+
 export default function HomePage() {
   const [clients, setClients]   = useState<any[]>([])
   const [filter, setFilter]     = useState('todos')
+  const [roiFilter, setRoiFilter] = useState('todos')
   const [search, setSearch]     = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [showForm, setShowForm] = useState(false)
@@ -133,11 +142,14 @@ export default function HomePage() {
     const q = search.toLowerCase()
     const mq = !q || c.nome.toLowerCase().includes(q) || (c.gestor||'').toLowerCase().includes(q) || (c.account||'').toLowerCase().includes(q)
     const mf = filter === 'todos' || c.status === filter || (filter.startsWith('resp:') && [c.gestor, c.account, c.estrategista].includes(filter.slice(5)))
-    return mq && mf
+    const mr = roiFilter === 'todos' || getRoiStatusKey(c) === roiFilter
+    return mq && mf && mr
   })
 
   const mrrTotal = clients.reduce((s, c) => s + (Number(c.mrr) || 0), 0)
   const totalMonetizado = clients.reduce((acc, c) => acc + (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0), 0)
+  const roiSaudavelCount = clients.filter(c => getRoiStatusKey(c) === 'saudavel').length
+  const roiCriticoCount = clients.filter(c => getRoiStatusKey(c) === 'critico').length
 
   // Clientes com Google Ads configurado (para o card de Performance)
   const clientesComGA = clients.filter(c => c.id && [
@@ -175,6 +187,8 @@ export default function HomePage() {
                 { label:'Em Atenção',       value:clients.filter(c=>c.status==='atencao').length,  color:C.amber,  bg:C.amberBg,  icon:'⚠' },
                 { label:'Tarefas Hoje',     value:tarefasHoje.length,                              color:C.amber,  bg:C.amberBg,  icon:'📅' },
                 { label:'Em Atraso',        value:tarefasAtraso.length, color:tarefasAtraso.length > 0 ? C.red : C.green, bg:tarefasAtraso.length > 0 ? C.redLight : C.greenBg, icon:'⏰' },
+                { label:'ROI Saudável',     value:roiSaudavelCount,     color:C.green, bg:C.greenBg, icon:'🟢' },
+                { label:'ROI Crítico',      value:roiCriticoCount,      color:roiCriticoCount > 0 ? C.red : C.green, bg:roiCriticoCount > 0 ? C.redLight : C.greenBg, icon:'🔴' },
                 { label:'MRR Consolidado',  value:fmtR(mrrTotal),       isMoney:true, grad:'linear-gradient(135deg, #1e293b 0%, #334155 100%)' },
                 { label:'Upsell (LTV Extra)',value:fmtR(totalMonetizado),isMoney:true, grad:'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' },
               ].map((k: any, i) => (
@@ -240,6 +254,15 @@ export default function HomePage() {
                   <option value="todos">Todos os Responsáveis</option>
                   {resps.map(r => <option key={r} value={`resp:${r}`}>{r}</option>)}
                 </select>
+
+                <select style={{height:38, background:'#f1f1f1', border:'none', borderRadius:8, padding:'0 10px', fontSize:13, outline:'none', cursor:'pointer'}}
+                  value={roiFilter} onChange={e=>setRoiFilter(e.target.value)}>
+                  <option value="todos">Todos os Status ROI/ROAS</option>
+                  <option value="saudavel">🟢 ROI Saudável</option>
+                  <option value="atencao">🟡 Atenção</option>
+                  <option value="critico">🔴 Crítico</option>
+                  <option value="implantacao">⚪ Em Implantação</option>
+                </select>
               </div>
             </div>
 
@@ -296,6 +319,7 @@ export default function HomePage() {
                   const ltvExtra = (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
                   const isExpiring = c.fimContrato && new Date(c.fimContrato).getTime() - new Date().getTime() < 30 * 864e5
                   const statusColor = c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber
+                  const roiMeta = roiRoasMeta(getRoiStatusKey(c))
 
                   return (
                     <div key={c.id} onClick={() => setSelected(c)} style={{
@@ -325,6 +349,10 @@ export default function HomePage() {
                             <div style={{fontWeight:800, fontSize:15, color:C.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{c.nome}</div>
                             <div style={{fontSize:11, fontWeight:700, color:statusColor}}>{badgeLbl(c.status).toUpperCase()}</div>
                           </div>
+                        </div>
+                        <div style={{display:'inline-flex', alignItems:'center', gap:5, background:roiMeta.bg, color:roiMeta.color, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20, marginBottom:10}}>
+                          <div style={{width:6, height:6, borderRadius:'50%', background:roiMeta.dot}} />
+                          {roiMeta.label}
                         </div>
                         <div style={{display:'flex', flexDirection:'column', gap:3}}>
                           <span style={{fontSize:10, color:C.text3, fontWeight:600}}>Última atividade: <span style={{color:C.text2, fontWeight:700}}>{getLastActivity(c)}</span></span>

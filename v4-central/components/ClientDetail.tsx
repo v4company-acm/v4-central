@@ -1,4 +1,6 @@
 import MetricsDashboard from './MetricsDashboard'
+import RoiRoasPanel from './RoiRoasPanel'
+import { roiRoasMeta, currentRoiCheck, suggestRoiRoasStatus, RoiRoasCheck } from '../lib/roiRoas'
 import { useState } from 'react'
 
 function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d.split('-');return`${day}/${m}/${y}`}catch{return d} }
@@ -8,6 +10,7 @@ function fmtNum(v: any) { if(!v&&v!==0) return '—'; return Number(v).toLocaleS
 // 🔴 ABAS REFORMULADAS: Otimizações, Reuniões e Anotações unificadas em "Atividades"
 const TABS = [
   {k:'dados',l:'Visão Geral'},
+  {k:'roiroas',l:'Status ROI/ROAS'},
   {k:'atividades',l:'Histórico (Feed)'},
   {k:'metricas',l:'Métricas e Dash'},
   {k:'monetizacoes',l:'Monetizações'},
@@ -27,6 +30,19 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
 
   const cats = [c.catSaber&&'Saber',c.catTer&&'Ter',c.catExecutar&&'Executar'].filter(Boolean).join(', ')||'—'
   const historico: any[] = c.metricasHistorico || []
+  const roiChecks: RoiRoasCheck[] = c.roiRoasChecks || []
+  const roiCurrent = currentRoiCheck(roiChecks)
+  const roiSuggestion = suggestRoiRoasStatus(historico)
+  const roiMeta = roiRoasMeta(roiCurrent?.status || roiSuggestion.status)
+
+  function addRoiCheck(check: RoiRoasCheck) {
+    onUpdate({ ...c, roiRoasChecks: [check, ...roiChecks] })
+  }
+  function removeRoiCheck(idx: number) {
+    const arr = [...roiChecks]
+    arr.splice(idx, 1)
+    onUpdate({ ...c, roiRoasChecks: arr })
+  }
 
   // Melhores valores do histórico
   const bestRoas = historico.length ? Math.max(...historico.map((m:any)=>parseFloat(m.roas)||0)) : null
@@ -87,11 +103,21 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
           <div style={{fontSize:28, fontWeight:800, color:'var(--text-main)', letterSpacing:'-0.01em'}}>{c.nome}</div>
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'auto repeat(3, 1fr)', gap:14, alignItems:'stretch'}}>
+        <div style={{display:'grid', gridTemplateColumns:'auto repeat(4, 1fr)', gap:14, alignItems:'stretch'}}>
           {/* MRR — card-herói */}
           <div style={{background:'var(--brand-gradient)', borderRadius:12, padding:'14px 20px', minWidth:150, display:'flex', flexDirection:'column', justifyContent:'center'}}>
             <span style={{fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:'.08em'}}>MRR Atual</span>
             <span style={{fontSize:22, fontWeight:900, color:'#fff'}}>{fmtR(c.mrr)}</span>
+          </div>
+
+          {/* ROI/ROAS */}
+          <div onClick={()=>setTab('roiroas')} style={{display:'flex', flexDirection:'column', gap:4, justifyContent:'center', cursor:'pointer'}}>
+            <span style={{fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1}}>Status ROI/ROAS</span>
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              <div style={{width:10, height:10, borderRadius:'50%', background:roiMeta.color}} />
+              <span style={{fontSize:16, fontWeight:800, color:roiMeta.color}}>{roiMeta.label}</span>
+            </div>
+            {!roiCurrent && <span style={{fontSize:11, fontWeight:600, color:'var(--text-muted)', marginTop:-4}}>(sugestão automática)</span>}
           </div>
 
           {/* Status */}
@@ -157,6 +183,16 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
           {c.descricao&&c.descricao!=='-'&&<div style={{marginTop:24, background:'var(--hover-bg)', padding:16, borderRadius:8, borderLeft:'4px solid var(--border-color)'}}><strong style={{display:'block', marginBottom:4}}>Sobre o projeto:</strong>{c.descricao}</div>}
           {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'rgba(251,46,10,0.08)', padding:16, borderRadius:8, borderLeft:'4px solid #FB2E0A'}}><strong style={{display:'block', marginBottom:4, color:'#FB2E0A'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
         </>}
+
+        {/* ABA: STATUS ROI/ROAS */}
+        {tab==='roiroas' && (
+          <RoiRoasPanel
+            historico={historico}
+            checks={roiChecks}
+            onAddCheck={addRoiCheck}
+            onRemoveCheck={removeRoiCheck}
+          />
+        )}
 
         {/* ABA: HISTÓRICO (TIMELINE UNIFICADA) */}
         {tab==='atividades' && <>
