@@ -36,8 +36,8 @@ const TOOLS = [
   { label:'Candidatura',      icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
   { label:'Produtividade',    icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
   { label:'Performance',      icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
-  { label:'Gestão de Projetos', icon:'🗂', href:'https://docs.google.com/spreadsheets/d/1NgADoUY7r9RZyhnfXdRYcHbaPWfWYTp_AAYA9j3nnzM/edit', color:'#0F6E56', bg:'#E1F5EE' },
-  { label:'Account Plan',     icon:'📑', href:'https://docs.google.com/spreadsheets/d/1qhy14Vhjifbyhgt1hAH_NLJ-FykZ95sr7nSJMUOBk68/edit', color:'#854F0B', bg:'#FAEEDA' },
+  { label:'Gestão de Projetos', icon:'🗂', href:'/gestao-projetos',     color:'#0F6E56', bg:'#E1F5EE' },
+  { label:'Account Plan',     icon:'📑', href:'/account-plan',         color:'#854F0B', bg:'#FAEEDA' },
 ]
 
 async function sbQuery(table: string, qs = '') {
