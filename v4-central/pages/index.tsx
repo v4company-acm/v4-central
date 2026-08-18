@@ -35,6 +35,7 @@ const TOOLS = [
   { label:'Check-in PPT',     icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight },
   { label:'Candidatura',      icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
   { label:'Produtividade',    icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
+  { label:'Resultados',       icon:'🚀', href:'/resultados',          color:'#DB2777', bg:'rgba(219,39,119,0.1)' },
   { label:'Performance',      icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
   { label:'Gestão de Projetos', icon:'🗂', href:'/gestao-projetos',     color:'#0F6E56', bg:'#E1F5EE' },
   { label:'Account Plan',     icon:'📑', href:'/account-plan',         color:'#854F0B', bg:'#FAEEDA' },
