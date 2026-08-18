@@ -1,7 +1,7 @@
 import MetricsDashboard from './MetricsDashboard'
-import RoiRoasPanel from './RoiRoasPanel'
-import { roiRoasMeta, currentRoiCheck, suggestRoiRoasStatus, RoiRoasCheck } from '../lib/roiRoas'
-import { useState } from 'react'
+import HealthPanel from './HealthPanel'
+import { healthMeta } from '../lib/health'
+import { useState, useEffect } from 'react'
 
 function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d.split('-');return`${day}/${m}/${y}`}catch{return d} }
 function fmtR(v: any) { if(!v&&v!==0) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) }
@@ -10,7 +10,7 @@ function fmtNum(v: any) { if(!v&&v!==0) return '—'; return Number(v).toLocaleS
 // 🔴 ABAS REFORMULADAS: Otimizações, Reuniões e Anotações unificadas em "Atividades"
 const TABS = [
   {k:'dados',l:'Visão Geral'},
-  {k:'roiroas',l:'Status ROI/ROAS'},
+  {k:'health',l:'Health Score'},
   {k:'atividades',l:'Histórico (Feed)'},
   {k:'metricas',l:'Métricas e Dash'},
   {k:'monetizacoes',l:'Monetizações'},
@@ -30,19 +30,19 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
 
   const cats = [c.catSaber&&'Saber',c.catTer&&'Ter',c.catExecutar&&'Executar'].filter(Boolean).join(', ')||'—'
   const historico: any[] = c.metricasHistorico || []
-  const roiChecks: RoiRoasCheck[] = c.roiRoasChecks || []
-  const roiCurrent = currentRoiCheck(roiChecks)
-  const roiSuggestion = suggestRoiRoasStatus(historico)
-  const roiMeta = roiRoasMeta(roiCurrent?.status || roiSuggestion.status)
 
-  function addRoiCheck(check: RoiRoasCheck) {
-    onUpdate({ ...c, roiRoasChecks: [check, ...roiChecks] })
-  }
-  function removeRoiCheck(idx: number) {
-    const arr = [...roiChecks]
-    arr.splice(idx, 1)
-    onUpdate({ ...c, roiRoasChecks: arr })
-  }
+  // Health Score — puxa o check de Projeto mais recente só pro tile do cabeçalho
+  // (o restante do detalhamento vive dentro do HealthPanel, na aba dedicada)
+  const [latestHealth, setLatestHealth] = useState<any>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/health-checks?cliente_id=${c.id}`)
+      .then(r => r.ok ? r.json() : { checks: [] })
+      .then(d => { if (!cancelled) setLatestHealth((d.checks || []).find((x: any) => x.dominio === 'projeto') || null) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [c.id])
+  const healthTileMeta = healthMeta(latestHealth?.status)
 
   // Melhores valores do histórico
   const bestRoas = historico.length ? Math.max(...historico.map((m:any)=>parseFloat(m.roas)||0)) : null
@@ -110,14 +110,14 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
             <span style={{fontSize:22, fontWeight:900, color:'#fff'}}>{fmtR(c.mrr)}</span>
           </div>
 
-          {/* ROI/ROAS */}
-          <div onClick={()=>setTab('roiroas')} style={{display:'flex', flexDirection:'column', gap:4, justifyContent:'center', cursor:'pointer'}}>
-            <span style={{fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1}}>Status ROI/ROAS</span>
+          {/* Health Score */}
+          <div onClick={()=>setTab('health')} style={{display:'flex', flexDirection:'column', gap:4, justifyContent:'center', cursor:'pointer'}}>
+            <span style={{fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1}}>Health Score (Projeto)</span>
             <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <div style={{width:10, height:10, borderRadius:'50%', background:roiMeta.color}} />
-              <span style={{fontSize:16, fontWeight:800, color:roiMeta.color}}>{roiMeta.label}</span>
+              <div style={{width:10, height:10, borderRadius:'50%', background:healthTileMeta.color}} />
+              <span style={{fontSize:16, fontWeight:800, color:healthTileMeta.color}}>{latestHealth ? `${healthTileMeta.label} · ${latestHealth.score}` : healthTileMeta.label}</span>
             </div>
-            {!roiCurrent && <span style={{fontSize:11, fontWeight:600, color:'var(--text-muted)', marginTop:-4}}>(sugestão automática)</span>}
+            {!latestHealth && <span style={{fontSize:11, fontWeight:600, color:'var(--text-muted)', marginTop:-4}}>(ainda sem avaliação registrada)</span>}
           </div>
 
           {/* Status */}
@@ -184,14 +184,9 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
           {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'rgba(251,46,10,0.08)', padding:16, borderRadius:8, borderLeft:'4px solid #FB2E0A'}}><strong style={{display:'block', marginBottom:4, color:'#FB2E0A'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
         </>}
 
-        {/* ABA: STATUS ROI/ROAS */}
-        {tab==='roiroas' && (
-          <RoiRoasPanel
-            historico={historico}
-            checks={roiChecks}
-            onAddCheck={addRoiCheck}
-            onRemoveCheck={removeRoiCheck}
-          />
+        {/* ABA: HEALTH SCORE */}
+        {tab==='health' && (
+          <HealthPanel client={c} onUpdateClient={onUpdate} />
         )}
 
         {/* ABA: HISTÓRICO (TIMELINE UNIFICADA) */}

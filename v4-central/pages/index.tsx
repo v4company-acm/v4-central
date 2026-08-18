@@ -5,7 +5,7 @@ import Head from 'next/head'
 import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
-import { roiRoasMeta, currentRoiCheck, suggestRoiRoasStatus } from '../lib/roiRoas'
+import { healthMeta } from '../lib/health'
 import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon } from '../components/Icon'
 
 const C = {
@@ -75,15 +75,11 @@ function getLastActivity(c: any) {
   return `Há ${diff} dias`
 }
 
-function getRoiStatusKey(c: any) {
-  const check = currentRoiCheck(c.roiRoasChecks)
-  return check?.status || suggestRoiRoasStatus(c.metricasHistorico).status
-}
 
 export default function HomePage() {
   const [clients, setClients]   = useState<any[]>([])
   const [filter, setFilter]     = useState('todos')
-  const [roiFilter, setRoiFilter] = useState('todos')
+  const [healthFilter, setHealthFilter] = useState('todos')
   const [search, setSearch]     = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [showForm, setShowForm] = useState(false)
@@ -91,12 +87,28 @@ export default function HomePage() {
   const [saving, setSaving]     = useState(false)
   const [tarefasHoje, setTarefasHoje]     = useState<any[]>([])
   const [tarefasAtraso, setTarefasAtraso] = useState<any[]>([])
+  const [healthPorCliente, setHealthPorCliente] = useState<Record<string, any>>({})
+  const [planosAtrasadosPorCliente, setPlanosAtrasadosPorCliente] = useState<Record<string, number>>({})
 
-  useEffect(() => { fetchClients(); fetchSuabase() }, [])
+  useEffect(() => { fetchClients(); fetchSuabase(); fetchHealthSummary() }, [])
 
   async function fetchClients() {
     const res = await fetch('/api/clients')
     if (res.ok) setClients(await res.json())
+  }
+
+  async function fetchHealthSummary() {
+    try {
+      const res = await fetch('/api/health-summary')
+      if (!res.ok) return
+      const d = await res.json()
+      setHealthPorCliente(d.porCliente || {})
+      setPlanosAtrasadosPorCliente(d.planosAtrasados || {})
+    } catch (e) {}
+  }
+
+  function getHealthStatusKey(c: any) {
+    return healthPorCliente[c.id]?.status || 'implantacao'
   }
 
   async function fetchSuabase() {
@@ -146,14 +158,15 @@ export default function HomePage() {
     const q = search.toLowerCase()
     const mq = !q || c.nome.toLowerCase().includes(q) || (c.gestor||'').toLowerCase().includes(q) || (c.account||'').toLowerCase().includes(q)
     const mf = filter === 'todos' || c.status === filter || (filter.startsWith('resp:') && [c.gestor, c.account, c.estrategista].includes(filter.slice(5)))
-    const mr = roiFilter === 'todos' || getRoiStatusKey(c) === roiFilter
-    return mq && mf && mr
+    const mh = healthFilter === 'todos' || getHealthStatusKey(c) === healthFilter
+    return mq && mf && mh
   })
 
   const mrrTotal = clients.reduce((s, c) => s + (Number(c.mrr) || 0), 0)
   const totalMonetizado = clients.reduce((acc, c) => acc + (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0), 0)
-  const roiSaudavelCount = clients.filter(c => getRoiStatusKey(c) === 'saudavel').length
-  const roiCriticoCount = clients.filter(c => getRoiStatusKey(c) === 'critico').length
+  const healthSaudavelCount = clients.filter(c => getHealthStatusKey(c) === 'saudavel').length
+  const healthCriticoCount = clients.filter(c => getHealthStatusKey(c) === 'critico').length
+  const planosAtrasadosTotal = Object.values(planosAtrasadosPorCliente).reduce((s: number, n: any) => s + Number(n || 0), 0)
 
   // Clientes com Google Ads configurado (para o card de Performance)
   const clientesComGA = clients.filter(c => c.id && [
@@ -191,8 +204,9 @@ export default function HomePage() {
                 { label:'Em Atenção',       value:clients.filter(c=>c.status==='atencao').length,  accent:C.amber },
                 { label:'Tarefas Hoje',     value:tarefasHoje.length,                              accent:C.text3 },
                 { label:'Em Atraso',        value:tarefasAtraso.length, accent:tarefasAtraso.length > 0 ? C.red : C.text3 },
-                { label:'ROI Saudável',     value:roiSaudavelCount,     accent:C.green },
-                { label:'ROI Crítico',      value:roiCriticoCount,      accent:roiCriticoCount > 0 ? C.red : C.text3 },
+                { label:'Health Saudável',  value:healthSaudavelCount,  accent:C.green },
+                { label:'Health Crítico',   value:healthCriticoCount,   accent:healthCriticoCount > 0 ? C.red : C.text3 },
+                { label:'Planos Atrasados', value:planosAtrasadosTotal, accent:planosAtrasadosTotal > 0 ? C.red : C.text3 },
                 { label:'MRR Consolidado',  value:fmtR(mrrTotal),       isMoney:true, dark:true },
                 { label:'Upsell (LTV Extra)',value:fmtR(totalMonetizado),isMoney:true, dark:true },
               ].map((k: any, i) => (
@@ -258,12 +272,12 @@ export default function HomePage() {
                 </select>
 
                 <select style={{height:38, background:'#f1f1f1', border:'none', borderRadius:8, padding:'0 10px', fontSize:13, outline:'none', cursor:'pointer'}}
-                  value={roiFilter} onChange={e=>setRoiFilter(e.target.value)}>
-                  <option value="todos">Todos os Status ROI/ROAS</option>
-                  <option value="saudavel">🟢 ROI Saudável</option>
-                  <option value="atencao">🟡 Atenção</option>
-                  <option value="critico">🔴 Crítico</option>
-                  <option value="implantacao">⚪ Em Implantação</option>
+                  value={healthFilter} onChange={e=>setHealthFilter(e.target.value)}>
+                  <option value="todos">Todos os Health Score</option>
+                  <option value="saudavel">Saudável</option>
+                  <option value="atencao">Atenção</option>
+                  <option value="critico">Crítico</option>
+                  <option value="implantacao">Em Implantação</option>
                 </select>
               </div>
             </div>
@@ -323,7 +337,9 @@ export default function HomePage() {
                   const ltvExtra = (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
                   const isExpiring = c.fimContrato && new Date(c.fimContrato).getTime() - new Date().getTime() < 30 * 864e5
                   const statusColor = c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber
-                  const roiMeta = roiRoasMeta(getRoiStatusKey(c))
+                  const hStatus = healthPorCliente[c.id]
+                  const hMeta = healthMeta(hStatus?.status)
+                  const atrasados = planosAtrasadosPorCliente[c.id] || 0
 
                   return (
                     <div key={c.id} onClick={() => setSelected(c)} style={{
@@ -354,9 +370,16 @@ export default function HomePage() {
                             <div style={{fontSize:11, fontWeight:700, color:statusColor}}>{badgeLbl(c.status).toUpperCase()}</div>
                           </div>
                         </div>
-                        <div style={{display:'inline-flex', alignItems:'center', gap:5, background:roiMeta.bg, color:roiMeta.color, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20, marginBottom:10}}>
-                          <div style={{width:6, height:6, borderRadius:'50%', background:roiMeta.dot}} />
-                          {roiMeta.label}
+                        <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:10}}>
+                          <div style={{display:'inline-flex', alignItems:'center', gap:5, background:hMeta.bg, color:hMeta.color, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20}}>
+                            <div style={{width:6, height:6, borderRadius:'50%', background:hMeta.dot}} />
+                            {hMeta.label}{hStatus?.score != null ? ` · ${hStatus.score}` : ''}
+                          </div>
+                          {atrasados > 0 && (
+                            <div style={{display:'inline-flex', alignItems:'center', gap:4, background:'rgba(251,46,10,0.1)', color:C.red, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20}}>
+                              {atrasados} plano{atrasados > 1 ? 's' : ''} atrasado{atrasados > 1 ? 's' : ''}
+                            </div>
+                          )}
                         </div>
                         <div style={{display:'flex', flexDirection:'column', gap:3}}>
                           <span style={{fontSize:10, color:C.text3, fontWeight:600}}>Última atividade: <span style={{color:C.text2, fontWeight:700}}>{getLastActivity(c)}</span></span>
