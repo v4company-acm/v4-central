@@ -66,6 +66,8 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   const [autor, setAutor] = useState(autorPadrao || '')
   const [dataRef, setDataRef] = useState(todayISO())
   const [observacao, setObservacao] = useState('')
+  const [trafegoFormOpen, setTrafegoFormOpen] = useState(false)
+  const [trafegoQuick, setTrafegoQuick] = useState({ data: todayISO(), roas: '', cpl: '', investimento: '' })
   const [metasOpen, setMetasOpen] = useState(false)
   const [metasForm, setMetasForm] = useState<Record<string, string>>({})
   const [planForm, setPlanForm] = useState<{ open: boolean; descricao: string; responsavel: string; prazo: string }>({ open: false, descricao: '', responsavel: '', prazo: '' })
@@ -124,6 +126,28 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   const planosPendentes = plans.filter(p => p.status === 'pendente')
   const planosDominio = dominio === 'projeto' ? planosPendentes : planosPendentes.filter(p => p.dominio === dominio)
   const planosAtrasados = planosPendentes.filter(p => p.prazo < todayISO())
+
+  function abrirTrafegoForm() {
+    setTrafegoQuick({
+      data: trafegoAtuais.dataRef || todayISO(),
+      roas: trafegoAtuais.roas != null ? String(trafegoAtuais.roas) : '',
+      cpl: trafegoAtuais.cpl != null ? String(trafegoAtuais.cpl) : '',
+      investimento: trafegoAtuais.investimento != null ? String(trafegoAtuais.investimento) : '',
+    })
+    setTrafegoFormOpen(true)
+  }
+
+  function salvarTrafegoQuick() {
+    if (!trafegoQuick.data) return alert('Informe a data de referência.')
+    const hist = [...(client.metricasHistorico || [])]
+    const idx = hist.findIndex((h: any) => h.data === trafegoQuick.data)
+    const patch = { roas: trafegoQuick.roas, cpl: trafegoQuick.cpl, invest: trafegoQuick.investimento, data: trafegoQuick.data, savedAt: new Date().toISOString() }
+    if (idx >= 0) hist[idx] = { ...hist[idx], ...patch }
+    else hist.unshift({ leads: '', roi: '', vendas: '', totalVendido: '', ...patch })
+    hist.sort((a: any, b: any) => String(b.data || '').localeCompare(String(a.data || '')))
+    onUpdateClient({ ...client, metricasHistorico: hist, metricas: hist[0] })
+    setTrafegoFormOpen(false)
+  }
 
   function abrirForm() {
     setAutor(autorPadrao || ''); setDataRef(todayISO()); setObservacao('')
@@ -241,6 +265,33 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <button className="btn btn-sm" onClick={() => setMetasOpen(false)}>Cancelar</button>
             <button className="btn btn-primary btn-sm" onClick={salvarMetas}>Salvar Metas</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── LANÇAMENTO RÁPIDO DE NÚMEROS DE TRÁFEGO ── */}
+      {dominio === 'trafego' && (
+        <div style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 10, padding: '14px 18px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {trafegoAtuais.dataRef
+              ? <>Números atuais vêm do lançamento de <strong style={{ color: 'var(--text-secondary)' }}>{fmtDate(trafegoAtuais.dataRef)}</strong> (compartilhado com a aba Métricas e Dash).</>
+              : <>Nenhum número de tráfego lançado ainda para esse cliente — lance abaixo pra calcular o score.</>}
+          </div>
+          {!trafegoFormOpen && <button className="btn btn-sm" onClick={abrirTrafegoForm}>{trafegoAtuais.dataRef ? 'Atualizar Números' : '+ Lançar Números de Tráfego'}</button>}
+        </div>
+      )}
+
+      {dominio === 'trafego' && trafegoFormOpen && (
+        <div style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 18, marginBottom: 20 }}>
+          <div className="form-grid-4" style={{ marginBottom: 4 }}>
+            <div className="field"><label>Data de referência</label><input type="date" value={trafegoQuick.data} onChange={e => setTrafegoQuick(p => ({ ...p, data: e.target.value }))} /></div>
+            <div className="field"><label>ROAS (ex: 4.8)</label><input value={trafegoQuick.roas} onChange={e => setTrafegoQuick(p => ({ ...p, roas: e.target.value }))} /></div>
+            <div className="field"><label>CPL (R$)</label><input type="number" value={trafegoQuick.cpl} onChange={e => setTrafegoQuick(p => ({ ...p, cpl: e.target.value }))} /></div>
+            <div className="field"><label>Investimento (R$)</label><input type="number" value={trafegoQuick.investimento} onChange={e => setTrafegoQuick(p => ({ ...p, investimento: e.target.value }))} /></div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-sm" onClick={() => setTrafegoFormOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={salvarTrafegoQuick}>Salvar Números</button>
           </div>
         </div>
       )}

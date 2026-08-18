@@ -2,6 +2,7 @@ import MetricsDashboard from './MetricsDashboard'
 import HealthPanel from './HealthPanel'
 import { healthMeta } from '../lib/health'
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 
 function fmtDate(d: string) { if(!d||d==='-') return '—'; try{const[y,m,day]=d.split('-');return`${day}/${m}/${y}`}catch{return d} }
 function fmtR(v: any) { if(!v&&v!==0) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) }
@@ -22,7 +23,11 @@ const TABS = [
 interface Props { client: any; onUpdate: (c: any) => void }
 
 export default function ClientDetail({ client: c, onUpdate }: Props) {
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === 'admin'
   const [tab, setTab] = useState('dados')
+  const [equipeEdit, setEquipeEdit] = useState(false)
+  const [equipeFields, setEquipeFields] = useState({ estrategista: '', gestor: '', account: '', closer: '', sdr: '' })
   const [itemForm, setItemForm] = useState<any>(null)
   const [ifields, setIfields] = useState<any>({})
   const [metForm, setMetForm] = useState(false)
@@ -57,6 +62,18 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
     const arr = [...(c[targetField]||[])]
     arr.splice(idx, 1)
     onUpdate({ ...c, [targetField]: arr })
+  }
+
+  function abrirEquipeEdit() {
+    setEquipeFields({
+      estrategista: c.estrategista || '', gestor: c.gestor || '', account: c.account || '',
+      closer: c.closer || '', sdr: c.sdr || '',
+    })
+    setEquipeEdit(true)
+  }
+  function salvarEquipe() {
+    onUpdate({ ...c, ...equipeFields })
+    setEquipeEdit(false)
   }
 
   function salvarMetrica() {
@@ -365,17 +382,39 @@ export default function ClientDetail({ client: c, onUpdate }: Props) {
         </>}
 
         {tab==='equipe' && <>
-          <div className="sec-title">Squad de Atendimento (V4)</div>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:32}}>
-            <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Estrategista Principal</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.estrategista||'Não definido'}</div></div>
-            <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Gestor de Tráfego</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.gestor||'Não definido'}</div></div>
-            <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Account Executive</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.account||'Não definido'}</div></div>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+            <div className="sec-title" style={{margin:0}}>Squad de Atendimento (V4)</div>
+            {isAdmin && !equipeEdit && <button className="btn btn-sm" onClick={abrirEquipeEdit}>Editar Equipe</button>}
           </div>
-          <div className="sec-title">Squad Comercial (Vendas)</div>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
-            <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Closer Responsável</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.closer||'Não definido'}</div></div>
-            <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>SDR (Pré-vendas)</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.sdr||'Não definido'}</div></div>
-          </div>
+
+          {equipeEdit ? (
+            <div style={{background:'var(--hover-bg)', border:'1px solid var(--border-color)', borderRadius:10, padding:20, marginBottom:32}}>
+              <div className="form-grid-3" style={{marginBottom:16}}>
+                <div className="field"><label>Estrategista Principal</label><input value={equipeFields.estrategista} onChange={e=>setEquipeFields(p=>({...p,estrategista:e.target.value}))} /></div>
+                <div className="field"><label>Gestor de Tráfego</label><input value={equipeFields.gestor} onChange={e=>setEquipeFields(p=>({...p,gestor:e.target.value}))} /></div>
+                <div className="field"><label>Account Executive</label><input value={equipeFields.account} onChange={e=>setEquipeFields(p=>({...p,account:e.target.value}))} /></div>
+              </div>
+              <div className="form-grid-3" style={{marginBottom:16}}>
+                <div className="field"><label>Closer Responsável</label><input value={equipeFields.closer} onChange={e=>setEquipeFields(p=>({...p,closer:e.target.value}))} /></div>
+                <div className="field"><label>SDR (Pré-vendas)</label><input value={equipeFields.sdr} onChange={e=>setEquipeFields(p=>({...p,sdr:e.target.value}))} /></div>
+              </div>
+              <div style={{display:'flex', gap:10}}>
+                <button className="btn btn-sm" onClick={()=>setEquipeEdit(false)}>Cancelar</button>
+                <button className="btn btn-primary btn-sm" onClick={salvarEquipe}>Salvar Equipe</button>
+              </div>
+            </div>
+          ) : <>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:32}}>
+              <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Estrategista Principal</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.estrategista||'Não definido'}</div></div>
+              <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Gestor de Tráfego</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.gestor||'Não definido'}</div></div>
+              <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Account Executive</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.account||'Não definido'}</div></div>
+            </div>
+            <div className="sec-title">Squad Comercial (Vendas)</div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+              <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>Closer Responsável</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.closer||'Não definido'}</div></div>
+              <div style={{background:'var(--hover-bg)', padding:16, borderRadius:8, border:'1px solid var(--border-color)'}}><div style={{fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase'}}>SDR (Pré-vendas)</div><div style={{fontSize:15, fontWeight:600, color:'var(--text-main)', marginTop:4}}>{c.sdr||'Não definido'}</div></div>
+            </div>
+          </>}
         </>}
 
         {tab==='links' && <>

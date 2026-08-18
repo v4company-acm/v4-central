@@ -57,10 +57,10 @@ export interface MetricResult {
   atual: number | null; meta: number | null; atingimento: number | null
 }
 
-/** Calcula o % de atingimento de UMA métrica (null = sem meta definida, não entra no score). */
+/** Calcula o % de atingimento de UMA métrica (null = sem meta OU sem número lançado ainda — não entra no score, não vira "crítico" por ausência de dado). */
 export function calcAtingimento(atual: number | null, meta: number | null, modo: MetricDef['modo']): number | null {
   if (meta == null || meta === 0) return null
-  if (atual == null) return 0
+  if (atual == null) return null
   if (modo === 'proximidade') return Math.max(0, 100 - (Math.abs(atual - meta) / meta) * 100)
   if (modo === 'menor_melhor') return atual > 0 ? (meta / atual) * 100 : 0
   return (atual / meta) * 100
