@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
 import { roiRoasMeta, currentRoiCheck, suggestRoiRoasStatus } from '../lib/roiRoas'
+import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon } from '../components/Icon'
 
 const C = {
   bg: 'var(--bg-color)',
@@ -25,20 +26,22 @@ const C = {
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-const COLORS = ['#E6F1FB|#185FA5','#EEEDFE|#534AB7','#E1F5EE|#0F6E56','#FAEEDA|#854F0B','#FAECE7|#993C1D','#EAF3DE|#3B6D11','#FBEAF0|#993556','#F1EFE8|#5F5E5A']
+// Paleta de avatar restrita e desaturada — variação suficiente pra escanear a grade
+// sem virar confete. Todos os tons puxam pra a identidade da marca (bordô/slate).
+const AVATAR_TONES = ['#3F1D17', '#2B2E33', '#4A2418', '#1F2937']
 function ini(n: string) { return (n||'?').split(' ').slice(0,2).map((w:string)=>w[0]).join('').toUpperCase() }
 function badgeLbl(s: string) { return {ativo:'Ativo',atencao:'Em atenção',churn:'Churn risk',inativo:'Inativo'}[s as string]||s }
 function fmtR(v: number) { return `R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}` }
 
 const TOOLS = [
-  { label:'Ekyte',            icon:'🎯', href:'https://app.ekyte.com', color:C.blue,  bg:C.blueBg  },
-  { label:'Check-in PPT',     icon:'📋', href:'/checkin',             color:C.red,   bg:C.redLight },
-  { label:'Candidatura',      icon:'📝', href:'/candidatura',         color:C.green, bg:C.greenBg  },
-  { label:'Produtividade',    icon:'⏱',  href:'/produtividade',       color:C.amber, bg:C.amberBg  },
-  { label:'Resultados',       icon:'🚀', href:'/resultados',          color:'#DB2777', bg:'rgba(219,39,119,0.1)' },
-  { label:'Performance',      icon:'📈', href:'/performance-page',    color:'#7c3aed', bg:'rgba(124,58,237,0.1)' },
-  { label:'Gestão de Projetos', icon:'🗂', href:'/gestao-projetos',     color:'#0F6E56', bg:'#E1F5EE' },
-  { label:'Account Plan',     icon:'📑', href:'/account-plan',         color:'#854F0B', bg:'#FAEEDA' },
+  { label:'Ekyte',              Icon:GridIcon,      href:'https://app.ekyte.com' },
+  { label:'Check-in PPT',       Icon:ClipboardIcon, href:'/checkin' },
+  { label:'Candidatura',        Icon:FileTextIcon,  href:'/candidatura' },
+  { label:'Produtividade',      Icon:ClockIcon,     href:'/produtividade' },
+  { label:'Resultados',         Icon:TrendingUpIcon,href:'/resultados' },
+  { label:'Performance',        Icon:BarChartIcon,  href:'/performance-page' },
+  { label:'Gestão de Projetos', Icon:FolderIcon,    href:'/gestao-projetos' },
+  { label:'Account Plan',       Icon:LayersIcon,    href:'/account-plan' },
 ]
 
 async function sbQuery(table: string, qs = '') {
@@ -182,54 +185,52 @@ export default function HomePage() {
           <div style={{maxWidth:1400, margin:'0 auto'}}>
 
             {/* ── 1. KPI STRIP ── */}
-            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:16, marginBottom:24}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:1, marginBottom:24, background:C.border, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden'}}>
               {[
-                { label:'Clientes Ativos',  value:clients.filter(c=>c.status==='ativo').length,    color:C.green,  bg:C.greenBg,  icon:'✓' },
-                { label:'Em Atenção',       value:clients.filter(c=>c.status==='atencao').length,  color:C.amber,  bg:C.amberBg,  icon:'⚠' },
-                { label:'Tarefas Hoje',     value:tarefasHoje.length,                              color:C.amber,  bg:C.amberBg,  icon:'📅' },
-                { label:'Em Atraso',        value:tarefasAtraso.length, color:tarefasAtraso.length > 0 ? C.red : C.green, bg:tarefasAtraso.length > 0 ? C.redLight : C.greenBg, icon:'⏰' },
-                { label:'ROI Saudável',     value:roiSaudavelCount,     color:C.green, bg:C.greenBg, icon:'🟢' },
-                { label:'ROI Crítico',      value:roiCriticoCount,      color:roiCriticoCount > 0 ? C.red : C.green, bg:roiCriticoCount > 0 ? C.redLight : C.greenBg, icon:'🔴' },
-                { label:'MRR Consolidado',  value:fmtR(mrrTotal),       isMoney:true, grad:'linear-gradient(135deg, #1e293b 0%, #334155 100%)' },
-                { label:'Upsell (LTV Extra)',value:fmtR(totalMonetizado),isMoney:true, grad:'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' },
+                { label:'Clientes Ativos',  value:clients.filter(c=>c.status==='ativo').length,    accent:C.green },
+                { label:'Em Atenção',       value:clients.filter(c=>c.status==='atencao').length,  accent:C.amber },
+                { label:'Tarefas Hoje',     value:tarefasHoje.length,                              accent:C.text3 },
+                { label:'Em Atraso',        value:tarefasAtraso.length, accent:tarefasAtraso.length > 0 ? C.red : C.text3 },
+                { label:'ROI Saudável',     value:roiSaudavelCount,     accent:C.green },
+                { label:'ROI Crítico',      value:roiCriticoCount,      accent:roiCriticoCount > 0 ? C.red : C.text3 },
+                { label:'MRR Consolidado',  value:fmtR(mrrTotal),       isMoney:true, dark:true },
+                { label:'Upsell (LTV Extra)',value:fmtR(totalMonetizado),isMoney:true, dark:true },
               ].map((k: any, i) => (
                 <div key={i} style={{
-                  background: k.grad || C.card, borderRadius:12, padding:'16px',
-                  border: k.grad ? 'none' : `1px solid ${C.border}`,
-                  boxShadow:'0 2px 10px rgba(0,0,0,0.04)',
-                  display:'flex', flexDirection:'column', justifyContent:'space-between'
+                  background: k.dark ? '#15181D' : C.card, padding:'16px 18px',
+                  display:'flex', flexDirection:'column', justifyContent:'space-between', gap:10,
+                  borderTop: k.accent ? `2px solid ${k.accent}` : (k.dark ? '2px solid #FB2E0A' : `2px solid transparent`),
                 }}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12}}>
-                    <span style={{fontSize:10, fontWeight:700, color:k.grad ? 'rgba(255,255,255,0.7)' : C.text3, textTransform:'uppercase', letterSpacing:1}}>{k.label}</span>
-                    {!k.grad && <div style={{width:24, height:24, borderRadius:6, background:k.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12}}>{k.icon}</div>}
-                  </div>
-                  <div style={{fontSize: k.isMoney ? 18 : 24, fontWeight:900, color: k.grad ? '#fff' : C.text}}>{k.value}</div>
+                  <span style={{fontSize:10, fontWeight:700, color:k.dark ? 'rgba(255,255,255,0.55)' : C.text3, textTransform:'uppercase', letterSpacing:'.08em'}}>{k.label}</span>
+                  <div style={{fontSize: k.isMoney ? 19 : 26, fontWeight:700, color: k.dark ? '#fff' : C.text, fontVariantNumeric:'tabular-nums'}}>{k.value}</div>
                 </div>
               ))}
             </div>
 
             {/* ── 2. BARRA DE ATALHOS E FILTROS ── */}
             <div style={{background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'12px 20px', marginBottom:24, display:'flex', alignItems:'center', gap:20, flexWrap:'wrap'}}>
-              <div style={{display:'flex', gap:8, borderRight:`1px solid ${C.border}`, paddingRight:20}}>
+              <div style={{display:'flex', gap:4, borderRight:`1px solid ${C.border}`, paddingRight:16}}>
                 {TOOLS.map((t, i) => (
                   <a key={i} href={t.href} target={t.href.startsWith('http')?'_blank':'_self'}
-                    style={{width:36, height:36, borderRadius:8, background:t.bg, display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none', transition:'transform 0.2s', position:'relative'}}
+                    style={{width:34, height:34, borderRadius:7, background:'transparent', color:C.text2, display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none', transition:'background .12s, color .12s', position:'relative'}}
                     onMouseEnter={e => {
-                      e.currentTarget.style.transform='scale(1.1)'
+                      e.currentTarget.style.background='var(--hover-bg)'
+                      e.currentTarget.style.color=C.red
                       const tip = e.currentTarget.querySelector('.tooltip') as HTMLElement
                       if (tip) tip.style.opacity = '1'
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.transform='scale(1)'
+                      e.currentTarget.style.background='transparent'
+                      e.currentTarget.style.color=C.text2
                       const tip = e.currentTarget.querySelector('.tooltip') as HTMLElement
                       if (tip) tip.style.opacity = '0'
                     }}
                     title={t.label}
                   >
-                    <span style={{fontSize:18}}>{t.icon}</span>
+                    <t.Icon size={17} strokeWidth={1.6} />
                     <span className="tooltip" style={{
-                      position:'absolute', bottom:-28, left:'50%', transform:'translateX(-50%)',
-                      background:'#111', color:'#fff', fontSize:10, fontWeight:600,
+                      position:'absolute', bottom:-26, left:'50%', transform:'translateX(-50%)',
+                      background:'var(--text-main)', color:'var(--card-color)', fontSize:10, fontWeight:600,
                       padding:'3px 8px', borderRadius:6, whiteSpace:'nowrap',
                       opacity:0, transition:'opacity 0.15s', pointerEvents:'none', zIndex:10
                     }}>{t.label}</span>
@@ -268,41 +269,43 @@ export default function HomePage() {
             </div>
 
             {/* ── 3. CARD DE PERFORMANCE ANALYTICS ── */}
-            <div style={{background:'var(--brand-gradient)', borderRadius:12, padding:'20px 24px', marginBottom:24, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
-              <div style={{display:'flex', alignItems:'center', gap:16}}>
-                <div style={{width:44, height:44, borderRadius:10, background:'rgba(251,46,10,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22}}>📈</div>
+            <div style={{background:'var(--brand-gradient)', borderRadius:12, padding:'18px 24px', marginBottom:24, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
+              <div style={{display:'flex', alignItems:'center', gap:14}}>
+                <div style={{width:38, height:38, borderRadius:8, background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.14)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', flexShrink:0}}>
+                  <TrendingUpIcon size={19} strokeWidth={1.6} />
+                </div>
                 <div>
-                  <p style={{margin:0, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)', textTransform:'uppercase', letterSpacing:'0.1em'}}>Módulo Analytics</p>
-                  <p style={{margin:'2px 0 0', fontSize:16, fontWeight:800, color:'#fff'}}>Performance de Tráfego</p>
-                  <p style={{margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,0.45)'}}>Google Ads · Funil · Benchmarks WordStream 2026</p>
+                  <p style={{margin:0, fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'0.1em'}}>Módulo Analytics</p>
+                  <p style={{margin:'2px 0 0', fontSize:15, fontWeight:700, color:'#fff'}}>Performance de Tráfego</p>
+                  <p style={{margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,0.5)'}}>Google Ads · Funil · Benchmarks WordStream 2026</p>
                 </div>
               </div>
-              <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap'}}>
+              <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
                 {clientesComGA.slice(0,3).map(c => (
                   <a key={c.id} href={`/performance-page?cliente_id=${c.id}`}
                     style={{
-                      padding:'8px 16px', borderRadius:8,
-                      background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)',
-                      color:'#fff', fontSize:12, fontWeight:600, textDecoration:'none',
-                      transition:'all 0.2s', display:'flex', alignItems:'center', gap:6
+                      padding:'7px 14px', borderRadius:7,
+                      background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.14)',
+                      color:'rgba(255,255,255,0.85)', fontSize:12, fontWeight:600, textDecoration:'none',
+                      transition:'all 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background='rgba(251,46,10,0.2)'; e.currentTarget.style.borderColor='rgba(251,46,10,0.4)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.12)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.14)'; e.currentTarget.style.color='#fff' }}
+                    onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.07)'; e.currentTarget.style.color='rgba(255,255,255,0.85)' }}
                   >
-                    📊 {c.nome}
+                    {c.nome}
                   </a>
                 ))}
                 <a href="/performance-page"
                   style={{
-                    padding:'8px 20px', borderRadius:8,
-                    background:'#FB2E0A', border:'none',
-                    color:'#fff', fontSize:12, fontWeight:700, textDecoration:'none',
-                    transition:'all 0.2s'
+                    padding:'7px 16px', borderRadius:7,
+                    background:'#fff', border:'none',
+                    color:'#1E2124', fontSize:12, fontWeight:700, textDecoration:'none',
+                    display:'inline-flex', alignItems:'center', gap:6, transition:'opacity .15s'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background='#D61A0E'}
-                  onMouseLeave={e => e.currentTarget.style.background='#FB2E0A'}
+                  onMouseEnter={e => e.currentTarget.style.opacity='0.88'}
+                  onMouseLeave={e => e.currentTarget.style.opacity='1'}
                 >
-                  Abrir Analytics →
+                  Abrir Analytics <ArrowRightIcon size={13} strokeWidth={2} />
                 </a>
               </div>
             </div>
@@ -310,13 +313,13 @@ export default function HomePage() {
             {/* ── 4. GRID DE CLIENTES ── */}
             {filtered.length === 0 ? (
               <div style={{padding:80, textAlign:'center', background:C.card, borderRadius:12, border:`1px dashed ${C.border2}`}}>
-                <div style={{fontSize:40, marginBottom:16}}>🔍</div>
+                <SearchIcon size={28} strokeWidth={1.4} style={{color:C.text3, marginBottom:14}} />
                 <div style={{color:C.text2, fontWeight:600}}>Nenhum cliente encontrado com os filtros atuais.</div>
               </div>
             ) : (
               <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(380px, 1fr))', gap:16}}>
                 {filtered.map((c) => {
-                  const [bg, fg] = COLORS[clients.indexOf(c) % COLORS.length].split('|')
+                  const avatarBg = AVATAR_TONES[clients.indexOf(c) % AVATAR_TONES.length]
                   const ltvExtra = (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
                   const isExpiring = c.fimContrato && new Date(c.fimContrato).getTime() - new Date().getTime() < 30 * 864e5
                   const statusColor = c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber
@@ -343,7 +346,7 @@ export default function HomePage() {
                           {c.cohort || 'Sem Cohort'}
                         </div>
                         <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:14}}>
-                          <div style={{width:40, height:40, borderRadius:10, background:bg, color:fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, flexShrink:0}}>
+                          <div style={{width:38, height:38, borderRadius:8, background:avatarBg, color:'rgba(255,255,255,0.92)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, letterSpacing:'.02em', flexShrink:0}}>
                             {ini(c.nome)}
                           </div>
                           <div style={{minWidth:0}}>
@@ -364,16 +367,16 @@ export default function HomePage() {
                       {/* ── ZONA DIREITA (evidência / dado em destaque) ── */}
                       <div style={{
                         width:140, flexShrink:0, padding:'20px 16px',
-                        background:C.redLight, borderLeft:`1px solid ${C.border}`,
+                        background:'var(--hover-bg)', borderLeft:`1px solid ${C.border}`,
                         display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'flex-end', gap:12
                       }}>
                         <div style={{textAlign:'right'}}>
-                          <div style={{fontSize:9, fontWeight:700, color:C.red, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:2}}>MRR</div>
-                          <div style={{fontSize:18, fontWeight:900, color:C.text}}>{fmtR(c.mrr || 0)}</div>
+                          <div style={{fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:2}}>MRR</div>
+                          <div style={{fontSize:18, fontWeight:700, color:C.text, fontVariantNumeric:'tabular-nums'}}>{fmtR(c.mrr || 0)}</div>
                         </div>
                         <div style={{textAlign:'right'}}>
                           <div style={{fontSize:9, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:2}}>LTV Extra</div>
-                          <div style={{fontSize:13, fontWeight:800, color:C.green}}>{fmtR(ltvExtra)}</div>
+                          <div style={{fontSize:13, fontWeight:700, color:ltvExtra > 0 ? C.green : C.text3, fontVariantNumeric:'tabular-nums'}}>{fmtR(ltvExtra)}</div>
                         </div>
                       </div>
                     </div>
@@ -390,7 +393,7 @@ export default function HomePage() {
           onClick={e=>{if(e.target===e.currentTarget){setShowForm(false);setEditClient(null)}}}>
           <div className="modal" style={{borderRadius:16}}>
             <div className="modal-header">
-              <h3 style={{fontWeight:800}}>{editClient ? '📝 Editar Cliente' : '🚀 Novo Cliente'}</h3>
+              <h3 style={{fontWeight:700}}>{editClient ? 'Editar Cliente' : 'Novo Cliente'}</h3>
               <button className="btn btn-ghost btn-sm" onClick={()=>{setShowForm(false);setEditClient(null)}}>✕</button>
             </div>
             <ClientForm initial={editClient} onSave={handleSave} onCancel={()=>{setShowForm(false);setEditClient(null)}} loading={saving}/>
