@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
 import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
 import Head from 'next/head'
@@ -62,6 +62,31 @@ function useSort<T = any>(rows: T[], defaultKey: keyof T, defaultDir: 1 | -1 = -
 const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }
 const secTitle: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
 
+// Barra de funil genérica — cada etapa mostra volume absoluto + taxa de conversão em
+// relação à etapa anterior, pra deixar claro onde o funil está perdendo gente.
+function FunnelBar({ stages }: { stages: { label: string; value: number; color: string }[] }) {
+  const max = Math.max(...stages.map(s => s.value), 1)
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {stages.map((s, i) => {
+        const prev = i > 0 ? stages[i - 1].value : null
+        const rate = prev ? (s.value / prev) * 100 : null
+        return (
+          <div key={s.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.text2, marginBottom: 4 }}>
+              <span style={{ fontWeight: 600 }}>{s.label}</span>
+              <span><strong style={{ color: C.text }}>{fmtN(s.value)}</strong>{rate != null && <span style={{ color: C.text3, marginLeft: 6 }}>({fmtPct(rate)} da etapa anterior)</span>}</span>
+            </div>
+            <div style={{ height: 10, background: 'var(--hover-bg)', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.max(2, (s.value / max) * 100)}%`, height: '100%', background: s.color, transition: 'width .3s' }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function ResultadosPage() {
   const today = new Date()
   const [clientes, setClientes] = useState<ClienteOpt[]>([])
@@ -73,6 +98,10 @@ export default function ResultadosPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [metric, setMetric] = useState<'invest' | 'conv' | 'leads'>('invest')
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set())
+  function toggleCampaign(name: string) {
+    setExpandedCampaigns(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next })
+  }
 
   useEffect(() => {
     fetch('/api/resultados-clientes').then(r => r.json()).then(d => {
@@ -265,7 +294,40 @@ export default function ResultadosPage() {
                 ))}
               </div>
 
-              {/* TABELA DE CAMPANHAS */}
+              {/* COMPARATIVO DE CANAIS — mídia paga x resultado real de vendas no CRM, lado a lado */}
+              {data.comparativoCanais?.length > 0 && (
+                <div style={card}>
+                  <div style={secTitle}>
+                    <span>Comparativo de Canais</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: C.text3, textTransform: 'none' }}>Vendas/Faturamento vêm do CRM — podem diferir das conversões da plataforma</span>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead><tr style={{ background: 'var(--hover-bg)' }}>
+                        {['Canal', 'Investimento', 'Cliques', 'Impressões', 'Conv. Plataforma', 'Vendas (CRM)', 'Faturamento (CRM)', 'ROAS Real'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {data.comparativoCanais.map((c: any) => (
+                          <tr key={c.canal} style={{ borderBottom: `1px solid ${C.border2}` }}>
+                            <td style={{ padding: '9px 12px', fontWeight: 700, color: C.text }}>{c.canal}</td>
+                            <td style={{ padding: '9px 12px' }}>{fmtR(c.spend)}</td>
+                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(c.clicks)}</td>
+                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(c.impressions)}</td>
+                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(c.conversoesPlataforma)}</td>
+                            <td style={{ padding: '9px 12px', color: c.vendasCrm != null ? C.green : C.text3, fontWeight: c.vendasCrm != null ? 700 : 400 }}>{c.vendasCrm != null ? fmtN(c.vendasCrm) : 'sem CRM associado'}</td>
+                            <td style={{ padding: '9px 12px', color: c.faturamentoCrm != null ? C.green : C.text3 }}>{c.faturamentoCrm != null ? fmtR(c.faturamentoCrm) : '—'}</td>
+                            <td style={{ padding: '9px 12px', fontWeight: 700 }}>{c.roasCrm != null ? c.roasCrm.toFixed(2) + 'x' : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TABELA DE CAMPANHAS — com drill-down por grupo de anúncio quando disponível */}
               {(googleFacet.sorted.length > 0 || metaFacet.sorted.length > 0) && (
                 <div style={card}>
                   <div style={secTitle}>Campanhas</div>
@@ -279,18 +341,36 @@ export default function ResultadosPage() {
                         <SortableTh label="Conversões" active={googleFacet.key === 'conversions'} dir={googleFacet.dir} onClick={() => googleFacet.toggle('conversions' as any)} />
                       </tr></thead>
                       <tbody>
-                        {[...googleFacet.sorted, ...metaFacet.sorted].map((r: any, i: number) => (
-                          <tr key={i} style={{ borderBottom: `1px solid ${C.border2}` }}>
-                            <td style={{ padding: '9px 12px', fontWeight: 600, color: C.text }}>{r.campaign_name}</td>
-                            <td style={{ padding: '9px 12px' }}>{fmtR(r.spend)}</td>
-                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.clicks)}</td>
-                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.impressions)}</td>
-                            <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.conversions)}</td>
-                          </tr>
-                        ))}
+                        {[...googleFacet.sorted, ...metaFacet.sorted].map((r: any, i: number) => {
+                          const hasAdGroups = r.adGroups?.length > 0
+                          const open = expandedCampaigns.has(r.campaign_name + i)
+                          return (
+                            <Fragment key={i}>
+                              <tr onClick={() => hasAdGroups && toggleCampaign(r.campaign_name + i)} style={{ borderBottom: `1px solid ${C.border2}`, cursor: hasAdGroups ? 'pointer' : 'default' }}>
+                                <td style={{ padding: '9px 12px', fontWeight: 600, color: C.text }}>{hasAdGroups && (open ? '▾ ' : '▸ ')}{r.campaign_name}{hasAdGroups && <span style={{ fontSize: 10, color: C.text3, fontWeight: 400 }}> ({r.adGroups.length} grupos)</span>}</td>
+                                <td style={{ padding: '9px 12px' }}>{fmtR(r.spend)}</td>
+                                <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.clicks)}</td>
+                                <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.impressions)}</td>
+                                <td style={{ padding: '9px 12px', color: C.text2 }}>{fmtN(r.conversions)}</td>
+                              </tr>
+                              {hasAdGroups && open && r.adGroups.map((ag: any, j: number) => (
+                                <tr key={`${i}-${j}`} style={{ borderBottom: `1px solid ${C.border2}`, background: 'var(--hover-bg)' }}>
+                                  <td style={{ padding: '7px 12px 7px 30px', color: C.text2, fontSize: 11 }}>↳ {ag.name}</td>
+                                  <td style={{ padding: '7px 12px', fontSize: 11 }}>{fmtR(ag.spend)}</td>
+                                  <td style={{ padding: '7px 12px', color: C.text3, fontSize: 11 }}>{fmtN(ag.clicks)}</td>
+                                  <td style={{ padding: '7px 12px', color: C.text3, fontSize: 11 }}>{fmtN(ag.impressions)}</td>
+                                  <td style={{ padding: '7px 12px', color: C.text3, fontSize: 11 }}>{fmtN(ag.conversions)}</td>
+                                </tr>
+                              ))}
+                            </Fragment>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
+                  {[...googleFacet.sorted, ...metaFacet.sorted].every((r: any) => !r.adGroups?.length) && (
+                    <div style={{ fontSize: 11, color: C.text3, marginTop: 10 }}>Detalhamento por grupo de anúncio não disponível pra esse canal/período.</div>
+                  )}
                 </div>
               )}
 
@@ -337,6 +417,31 @@ export default function ResultadosPage() {
                         <div style={{ fontSize: 20, fontWeight: 900, color: s.color || C.text }}>{typeof s.v === 'number' ? fmtN(s.v) : s.v}</div>
                       </div>
                     ))}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div style={card}>
+                      <div style={secTitle}>Funil de Vendas</div>
+                      <FunnelBar stages={[
+                        { label: 'Leads', value: norm.crm.totals.leads, color: C.blue },
+                        { label: 'Oportunidades', value: norm.crm.totals.opportunities, color: C.amber },
+                        { label: 'Ganhos', value: norm.crm.totals.won, color: C.green },
+                      ]} />
+                      <div style={{ fontSize: 11, color: C.text3, marginTop: 10 }}>
+                        {fmtN(norm.crm.totals.lost)} oportunidades perdidas · win rate de {fmtPct(norm.crm.totals.win_rate)} sobre ganhos+perdidos
+                      </div>
+                    </div>
+                    {(() => {
+                      const stageMap: Record<string, number> = {}
+                      ;(norm.crm.cities || []).forEach((c: any) => (c.open_by_stage || []).forEach((s: any) => { stageMap[s.stage] = (stageMap[s.stage] || 0) + s.count }))
+                      const stages = Object.entries(stageMap).filter(([, v]) => v > 0)
+                      return stages.length > 0 ? (
+                        <div style={card}>
+                          <div style={secTitle}>Pipeline em Aberto por Estágio</div>
+                          <FunnelBar stages={stages.map(([label, value]) => ({ label, value, color: C.blue }))} />
+                        </div>
+                      ) : <div />
+                    })()}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
@@ -426,34 +531,52 @@ export default function ResultadosPage() {
 
               {/* CRM BÁSICO (leads/CRM próprio, quando não tem webhook dedicado) */}
               {!norm.crm && data.crmBasico && (
-                <div style={card}>
-                  <div style={secTitle}>CRM — Funil de Vendas</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 16 }}>
-                    {[
-                      { l: 'Leads', v: data.crmBasico.totalLeads }, { l: 'Orçados', v: data.crmBasico.orcados },
-                      { l: 'Vendidos', v: data.crmBasico.vendidos, color: C.green }, { l: 'Taxa de Fechamento', v: fmtPct(data.crmBasico.taxaFechamento) },
-                      { l: 'Valor Orçado', v: fmtR(data.crmBasico.valorOrcado) }, { l: 'Valor Fechado', v: fmtR(data.crmBasico.valorFechado), color: C.green },
-                    ].map(s => (
-                      <div key={s.l} style={{ background: 'var(--hover-bg)', borderRadius: 8, padding: 12 }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>{s.l}</div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: s.color || C.text }}>{typeof s.v === 'number' ? fmtN(s.v) : s.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {data.crmBasico.porOrigem?.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, textTransform: 'uppercase', marginBottom: 8 }}>Leads por Origem</div>
-                      {data.crmBasico.porOrigem.map((o: any) => {
-                        const max = Math.max(...data.crmBasico.porOrigem.map((x: any) => x.count), 1)
-                        return (
-                          <div key={o.origem} style={{ marginBottom: 8 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.text2, marginBottom: 3 }}><span>{o.origem}</span><span style={{ fontWeight: 700 }}>{o.count}</span></div>
-                            <div style={{ height: 6, background: 'var(--hover-bg)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(o.count / max) * 100}%`, height: '100%', background: C.blue }} /></div>
-                          </div>
-                        )
-                      })}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 16 }}>
+                  <div style={card}>
+                    <div style={secTitle}>Funil de Vendas</div>
+                    <FunnelBar stages={[
+                      { label: 'Leads', value: data.crmBasico.totalLeads, color: C.blue },
+                      { label: 'Orçados', value: data.crmBasico.orcados, color: C.amber },
+                      { label: 'Vendidos', value: data.crmBasico.vendidos, color: C.green },
+                    ]} />
+                    <div style={{ fontSize: 11, color: C.text3, marginTop: 10 }}>
+                      {data.crmBasico.perdidos} orçados não fecharam (motivo de perda não é registrado na fonte de dados atual).
                     </div>
-                  )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginTop: 16 }}>
+                      {[
+                        { l: 'Valor Orçado', v: fmtR(data.crmBasico.valorOrcado) }, { l: 'Valor Fechado', v: fmtR(data.crmBasico.valorFechado), color: C.green },
+                        { l: 'Em Aberto', v: fmtR(data.crmBasico.valorEmAberto), color: C.amber }, { l: 'Taxa de Fechamento', v: fmtPct(data.crmBasico.taxaFechamento), color: C.green },
+                      ].map(s => (
+                        <div key={s.l} style={{ background: 'var(--hover-bg)', borderRadius: 8, padding: 10 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>{s.l}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: s.color || C.text }}>{s.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={card}>
+                    <div style={secTitle}>Vendas por Origem</div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead><tr style={{ background: 'var(--hover-bg)' }}>
+                          {['Origem', 'Leads', 'Orçados', 'Vendidos', 'Faturamento', 'Fechamento'].map(h => <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                          {(data.crmBasico.porOrigem || []).map((o: any) => (
+                            <tr key={o.origem} style={{ borderBottom: `1px solid ${C.border2}` }}>
+                              <td style={{ padding: '8px 10px', fontWeight: 600, color: C.text }}>{o.origem}</td>
+                              <td style={{ padding: '8px 10px', color: C.text2 }}>{fmtN(o.leads)}</td>
+                              <td style={{ padding: '8px 10px', color: C.text2 }}>{fmtN(o.orcados)}</td>
+                              <td style={{ padding: '8px 10px', color: C.green, fontWeight: 700 }}>{fmtN(o.vendidos)}</td>
+                              <td style={{ padding: '8px 10px' }}>{fmtR(o.valorFechado)}</td>
+                              <td style={{ padding: '8px 10px', color: C.text2 }}>{fmtPct(o.taxaFechamento)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
