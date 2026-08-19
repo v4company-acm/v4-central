@@ -44,7 +44,7 @@ export default function HealthScorePage() {
 
   async function load() {
     setLoading(true)
-    const [cRes, hRes] = await Promise.all([fetch('/api/clients'), fetch('/api/health-summary')])
+    const [cRes, hRes] = await Promise.all([fetch('/api/clients', { cache: 'no-store' }), fetch('/api/health-summary', { cache: 'no-store' })])
     setClients(cRes.ok ? await cRes.json() : [])
     if (hRes.ok) {
       const d = await hRes.json()

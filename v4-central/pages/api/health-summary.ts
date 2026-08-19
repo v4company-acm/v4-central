@@ -12,6 +12,8 @@ const supabase = createClient(
 // por cliente — usado pro dashboard e pra tela unificada de Health Score, sem
 // precisar buscar o histórico completo de cada cliente um por um.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store, must-revalidate')
+
   const session = await getServerSession(req, res, authOptions)
   if (!session) return res.status(401).json({ error: 'Não autorizado' })
 

@@ -106,13 +106,13 @@ export default function HomePage() {
   }, [router.query.cliente, clients])
 
   async function fetchClients() {
-    const res = await fetch('/api/clients')
+    const res = await fetch('/api/clients', { cache: 'no-store' })
     if (res.ok) setClients(await res.json())
   }
 
   async function fetchHealthSummary() {
     try {
-      const res = await fetch('/api/health-summary')
+      const res = await fetch('/api/health-summary', { cache: 'no-store' })
       if (!res.ok) return
       const d = await res.json()
       setHealthPorCliente(d.porCliente || {})

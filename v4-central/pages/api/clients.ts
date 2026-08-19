@@ -5,6 +5,8 @@ import { readJSON, writeJSON } from '../../lib/db'
 import { v4 as uuidv4 } from 'uuid'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store, must-revalidate')
+
   const session = await getServerSession(req, res, authOptions)
   if (!session) return res.status(401).json({ error: 'Não autorizado' })
 

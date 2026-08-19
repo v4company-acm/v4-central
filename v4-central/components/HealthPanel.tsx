@@ -85,13 +85,20 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [chkRes, planRes] = await Promise.all([
-      fetch(`/api/health-checks?cliente_id=${client.id}`),
-      fetch(`/api/action-plans?cliente_id=${client.id}`),
-    ])
-    setChecks((await chkRes.json()).checks || [])
-    setPlans((await planRes.json()).plans || [])
-    setLoading(false)
+    try {
+      const [chkRes, planRes] = await Promise.all([
+        fetch(`/api/health-checks?cliente_id=${client.id}`, { cache: 'no-store' }),
+        fetch(`/api/action-plans?cliente_id=${client.id}`, { cache: 'no-store' }),
+      ])
+      if (!chkRes.ok || !planRes.ok) throw new Error('Falha ao carregar Health Score')
+      setChecks((await chkRes.json()).checks || [])
+      setPlans((await planRes.json()).plans || [])
+    } catch (e) {
+      // não zera o que já estava na tela — evita que uma falha de rede passe a impressão de "sumiu tudo"
+      console.error('Erro ao carregar Health Score:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [client.id])
 
   useEffect(() => { load() }, [load])
@@ -219,20 +226,20 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
     }
     const res = await fetch('/api/health-checks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (res.ok) {
-      const { check } = await res.json()
-      setChecks(p => [check, ...p])
+      await load() // re-busca do servidor em vez de confiar só na resposta local — garante que o que aparece na tela é o que está de fato salvo
       setFormOpen(false)
       if (calc.status !== 'saudavel') setPlanForm({ open: true, descricao: '', responsavel: autor.trim(), prazo: '' })
     } else {
-      alert('Erro ao salvar. Tenta de novo.')
+      const d = await res.json().catch(() => ({}))
+      alert(`Erro ao salvar: ${d.error || 'tenta de novo.'}`)
     }
   }
 
   async function excluirCheck(id: number) {
     if (!confirm('Excluir este registro de Health Score permanentemente? Não dá pra desfazer.')) return
     const res = await fetch(`/api/health-checks?id=${id}`, { method: 'DELETE' })
-    if (res.ok) setChecks(p => p.filter(c => c.id !== id))
-    else alert('Não consegui excluir. Tenta de novo.')
+    if (res.ok) await load()
+    else { const d = await res.json().catch(() => ({})); alert(`Não consegui excluir: ${d.error || 'tenta de novo.'}`) }
   }
 
   async function salvarPlano() {
@@ -241,9 +248,11 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
     const body = { cliente_id: client.id, health_check_id: lastCheck?.id || null, dominio, descricao: planForm.descricao.trim(), responsavel: planForm.responsavel.trim(), prazo: planForm.prazo, criado_por: autor.trim() || autorPadrao || 'Não informado' }
     const res = await fetch('/api/action-plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (res.ok) {
-      const { plan } = await res.json()
-      setPlans(p => [...p, plan])
+      await load()
       setPlanForm({ open: false, descricao: '', responsavel: '', prazo: '' })
+    } else {
+      const d = await res.json().catch(() => ({}))
+      alert(`Erro ao salvar plano: ${d.error || 'tenta de novo.'}`)
     }
   }
 
@@ -252,9 +261,11 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
     const body = { id, status: confirmForm.status, resultado: confirmForm.resultado.trim(), confirmado_por: autorPadrao || 'Não informado' }
     const res = await fetch('/api/action-plans', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (res.ok) {
-      const { plan } = await res.json()
-      setPlans(p => p.map(x => x.id === id ? plan : x))
+      await load()
       setConfirmingId(null); setConfirmForm({ status: 'confirmado_funcionou', resultado: '' })
+    } else {
+      const d = await res.json().catch(() => ({}))
+      alert(`Erro ao confirmar: ${d.error || 'tenta de novo.'}`)
     }
   }
 

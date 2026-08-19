@@ -41,6 +41,8 @@ async function fetchWindsor(kind: 'google_ads' | 'facebook', fields: string[], d
 // mesma fonte de dados da tela de Resultados (webhook dedicado quando existe, senão Windsor
 // direto), só que resumido em 3 números em vez do payload completo da tela.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store, must-revalidate')
+
   const session = await getServerSession(req, res, authOptions)
   if (!session) return res.status(401).json({ error: 'Não autorizado' })
 
