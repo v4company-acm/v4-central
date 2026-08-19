@@ -45,6 +45,8 @@ function toRow(c: any) {
     metricas:          c.metricas      ?? {},
     metricas_historico: c.metricasHistorico ?? [],
     roi_roas_checks:   c.roiRoasChecks ?? [],
+    metas:             c.metas         ?? {},
+    resultados_cliente_id: c.resultadosClienteId || null,
   }
 }
 
@@ -88,6 +90,8 @@ function fromRow(r: any) {
     metricas:          r.metricas          ?? {},
     metricasHistorico: r.metricas_historico ?? [],
     roiRoasChecks:     r.roi_roas_checks    ?? [],
+    metas:             r.metas             ?? {},
+    resultadosClienteId: r.resultados_cliente_id || null,
   }
 }
 

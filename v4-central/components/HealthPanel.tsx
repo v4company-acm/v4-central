@@ -70,6 +70,10 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   const [observacao, setObservacao] = useState('')
   const [trafegoFormOpen, setTrafegoFormOpen] = useState(false)
   const [trafegoQuick, setTrafegoQuick] = useState({ data: todayISO(), roas: '', cpl: '', investimento: '' })
+  const [windsorOpcoes, setWindsorOpcoes] = useState<{ id: string; nome: string }[]>([])
+  const [windsorSelecionado, setWindsorSelecionado] = useState('')
+  const [windsorFetching, setWindsorFetching] = useState(false)
+  const [windsorInfo, setWindsorInfo] = useState<{ fonte: string; periodo: { date_from: string; date_to: string } } | null>(null)
   const [metasOpen, setMetasOpen] = useState(false)
   const [metasForm, setMetasForm] = useState<Record<string, string>>({})
   const [planForm, setPlanForm] = useState<{ open: boolean; descricao: string; responsavel: string; prazo: string }>({ open: false, descricao: '', responsavel: '', prazo: '' })
@@ -89,6 +93,39 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setMetasForm(Object.fromEntries(Object.entries(client.metas || {}).map(([k, v]) => [k, String(v)]))) }, [client.metas])
+
+  // Opções de vínculo com a fonte de dados real (Windsor/Kommo) da tela de Resultados —
+  // não dá pra casar automaticamente clients x clientes (cadastros sem relação garantida),
+  // então o vínculo é escolhido uma vez manualmente e fica salvo no cliente.
+  useEffect(() => {
+    fetch('/api/resultados-clientes').then(r => r.ok ? r.json() : { clientes: [] }).then(d => setWindsorOpcoes(d.clientes || [])).catch(() => {})
+  }, [])
+
+  async function buscarDoWindsor() {
+    if (!client.resultadosClienteId) return
+    setWindsorFetching(true)
+    try {
+      const res = await fetch(`/api/health-trafego-auto?resultados_cliente_id=${client.resultadosClienteId}&dias=30`)
+      if (!res.ok) { alert('Não consegui buscar os dados agora. Tenta de novo em instantes.'); return }
+      const d = await res.json()
+      if (d.fonte === 'nenhuma') { alert('Esse vínculo não tem conta de Google/Meta Ads configurada no Windsor.'); return }
+      setTrafegoQuick({
+        data: todayISO(),
+        roas: d.roas != null ? d.roas.toFixed(2) : '',
+        cpl: d.cpl != null ? d.cpl.toFixed(2) : '',
+        investimento: d.investimento != null ? d.investimento.toFixed(2) : '',
+      })
+      setWindsorInfo({ fonte: d.fonte, periodo: d.periodo })
+      setTrafegoFormOpen(true)
+    } finally {
+      setWindsorFetching(false)
+    }
+  }
+
+  async function vincularWindsor() {
+    if (!windsorSelecionado) return
+    onUpdateClient({ ...client, resultadosClienteId: windsorSelecionado })
+  }
 
   const latestByDominio = useCallback((d: Dominio) => checks.filter(c => c.dominio === d)[0] || null, [checks])
 
@@ -143,6 +180,7 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
       cpl: trafegoAtuais.cpl != null ? String(trafegoAtuais.cpl) : '',
       investimento: trafegoAtuais.investimento != null ? String(trafegoAtuais.investimento) : '',
     })
+    setWindsorInfo(null)
     setTrafegoFormOpen(true)
   }
 
@@ -297,12 +335,35 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
               ? <>Números atuais vêm do lançamento de <strong style={{ color: 'var(--text-secondary)' }}>{fmtDate(trafegoAtuais.dataRef)}</strong> (compartilhado com a aba Métricas e Dash).</>
               : <>Nenhum número de tráfego lançado ainda para esse cliente — lance abaixo pra calcular o score.</>}
           </div>
-          {!trafegoFormOpen && <button className="btn btn-sm" onClick={abrirTrafegoForm}>{trafegoAtuais.dataRef ? 'Atualizar Números' : '+ Lançar Números de Tráfego'}</button>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {client.resultadosClienteId && (
+              <button className="btn btn-sm" onClick={buscarDoWindsor} disabled={windsorFetching}>
+                {windsorFetching ? 'Buscando...' : 'Buscar do Windsor (30d)'}
+              </button>
+            )}
+            {!trafegoFormOpen && <button className="btn btn-sm" onClick={abrirTrafegoForm}>{trafegoAtuais.dataRef ? 'Atualizar Números' : '+ Lançar Números de Tráfego'}</button>}
+          </div>
+        </div>
+      )}
+
+      {dominio === 'trafego' && !client.resultadosClienteId && windsorOpcoes.length > 0 && (
+        <div style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Esse cliente tem dados reais de mídia no Windsor — vincular pra buscar os números automaticamente?</span>
+          <select value={windsorSelecionado} onChange={e => setWindsorSelecionado(e.target.value)} style={{ height: 32, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: 12, padding: '0 8px' }}>
+            <option value="">Selecionar conta...</option>
+            {windsorOpcoes.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </select>
+          <button className="btn btn-sm btn-primary" disabled={!windsorSelecionado} onClick={vincularWindsor}>Vincular</button>
         </div>
       )}
 
       {dominio === 'trafego' && trafegoFormOpen && (
         <div style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 18, marginBottom: 20 }}>
+          {windsorInfo && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+              Preenchido automaticamente via <strong>{windsorInfo.fonte === 'webhook' ? 'Kommo + Windsor' : 'Windsor'}</strong> · período {fmtDate(windsorInfo.periodo.date_from)} a {fmtDate(windsorInfo.periodo.date_to)} — confira antes de salvar.
+            </div>
+          )}
           <div className="form-grid-4" style={{ marginBottom: 4 }}>
             <div className="field"><label>Data de referência</label><input type="date" value={trafegoQuick.data} onChange={e => setTrafegoQuick(p => ({ ...p, data: e.target.value }))} /></div>
             <div className="field"><label>ROAS (ex: 4.8)</label><input value={trafegoQuick.roas} onChange={e => setTrafegoQuick(p => ({ ...p, roas: e.target.value }))} /></div>
@@ -310,8 +371,8 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
             <div className="field"><label>Investimento (R$)</label><input type="number" value={trafegoQuick.investimento} onChange={e => setTrafegoQuick(p => ({ ...p, investimento: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-sm" onClick={() => setTrafegoFormOpen(false)}>Cancelar</button>
-            <button className="btn btn-primary btn-sm" onClick={salvarTrafegoQuick}>Salvar Números</button>
+            <button className="btn btn-sm" onClick={() => { setTrafegoFormOpen(false); setWindsorInfo(null) }}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={() => { salvarTrafegoQuick(); setWindsorInfo(null) }}>Salvar Números</button>
           </div>
         </div>
       )}
