@@ -20,3 +20,4 @@ export const LayersIcon = (p: Props) => <Svg {...p}><path d="M12 3l9 5-9 5-9-5z"
 export const SearchIcon = (p: Props) => <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></Svg>
 export const PlusIcon = (p: Props) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>
 export const ArrowRightIcon = (p: Props) => <Svg {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Svg>
+export const ActivityIcon = (p: Props) => <Svg {...p}><path d="M3 12h4l2-7 4 14 2-7h6" /></Svg>

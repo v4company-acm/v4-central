@@ -20,12 +20,12 @@ const TABS = [
   {k:'links',l:'Links'},
 ]
 
-interface Props { client: any; onUpdate: (c: any) => void }
+interface Props { client: any; onUpdate: (c: any) => void; initialTab?: string }
 
-export default function ClientDetail({ client: c, onUpdate }: Props) {
+export default function ClientDetail({ client: c, onUpdate, initialTab }: Props) {
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.role === 'admin'
-  const [tab, setTab] = useState('dados')
+  const [tab, setTab] = useState(initialTab || 'dados')
   const [equipeEdit, setEquipeEdit] = useState(false)
   const [equipeFields, setEquipeFields] = useState({ estrategista: '', gestor: '', account: '', closer: '', sdr: '' })
   const [itemForm, setItemForm] = useState<any>(null)

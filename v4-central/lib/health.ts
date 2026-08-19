@@ -99,6 +99,40 @@ export function computeProjetoScore(
   return { score, status }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Checklist qualitativo de Projeto — os mesmos critérios que o time já usa
+// na planilha de Health Score (ROI, CSAT, NPS, geração de demanda, conta
+// de anúncios, CRM, check-in, fee, growth) trazidos pro app como registro
+// estruturado. NÃO tentamos reproduzir o % de "Probabilidade de Churn"
+// ponderado da planilha (os pesos por critério não estão documentados em
+// lugar nenhum e inventar um número aqui seria pior que não ter nenhum) —
+// em vez disso mostramos uma contagem transparente e auditável de sinais
+// de atenção, que é honesta sobre o que está sendo medido.
+// ─────────────────────────────────────────────────────────────────────────
+export interface ChecklistItem { key: string; label: string }
+export const PROJETO_CHECKLIST: ChecklistItem[] = [
+  { key: 'roi', label: 'ROI acima de 1x?' },
+  { key: 'csat', label: 'CSAT igual ou superior a 4?' },
+  { key: 'nps', label: 'NPS igual ou superior a 7?' },
+  { key: 'demandaDiaria', label: 'Geração de demanda diária?' },
+  { key: 'stakeholderConsciente', label: 'Stakeholder pagador consciente dos avanços?' },
+  { key: 'contaAtiva', label: 'Conta de anúncios ativa e com saldo OK?' },
+  { key: 'crmEmUso', label: 'CRM em uso pelo cliente?' },
+  { key: 'checkin', label: 'Pelo menos 1 check-in realizado no período?' },
+  { key: 'feeEmDia', label: 'Fee em dia?' },
+  { key: 'growth', label: 'Teve growth/upsell no período?' },
+]
+export type ChecklistAnswers = Record<string, 'sim' | 'nao' | null>
+
+/** Conta quantos critérios (checklist + playbook) estão em "Não" — sinal de atenção transparente, sem pesos inventados. */
+export function computeAlertSignals(checklist: ChecklistAnswers, playbook: 'sim' | 'parcial' | 'nao' | null) {
+  const total = PROJETO_CHECKLIST.length + 1 // +1 = playbook, que já tem seletor próprio
+  let alertas = 0
+  PROJETO_CHECKLIST.forEach(c => { if (checklist?.[c.key] === 'nao') alertas++ })
+  if (playbook === 'nao' || playbook === 'parcial') alertas++
+  return { alertas, total }
+}
+
 export function fmtMetricValue(v: number | null, unidade: MetricDef['unidade']) {
   if (v == null || isNaN(v)) return '—'
   if (unidade === 'moeda') return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

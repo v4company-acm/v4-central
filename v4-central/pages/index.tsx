@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
 import { healthMeta } from '../lib/health'
-import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon } from '../components/Icon'
+import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon, ActivityIcon } from '../components/Icon'
 
 const C = {
   bg: 'var(--bg-color)',
@@ -42,6 +43,7 @@ const TOOLS = [
   { label:'Performance',        Icon:BarChartIcon,  href:'/performance-page' },
   { label:'Gestão de Projetos', Icon:FolderIcon,    href:'/gestao-projetos' },
   { label:'Account Plan',       Icon:LayersIcon,    href:'/account-plan' },
+  { label:'Health Score',       Icon:ActivityIcon,  href:'/health-score' },
 ]
 
 async function sbQuery(table: string, qs = '') {
@@ -77,6 +79,7 @@ function getLastActivity(c: any) {
 
 
 export default function HomePage() {
+  const router = useRouter()
   const [clients, setClients]   = useState<any[]>([])
   const [filter, setFilter]     = useState('todos')
   const [healthFilter, setHealthFilter] = useState('todos')
@@ -91,6 +94,16 @@ export default function HomePage() {
   const [planosAtrasadosPorCliente, setPlanosAtrasadosPorCliente] = useState<Record<string, number>>({})
 
   useEffect(() => { fetchClients(); fetchSuabase(); fetchHealthSummary() }, [])
+
+  // Deep-link vindo de outras telas (ex: Health Score) — ?cliente=<id> seleciona
+  // o card automaticamente ao carregar, sem precisar clicar de novo na grade.
+  useEffect(() => {
+    const clienteId = router.query.cliente
+    if (typeof clienteId === 'string' && clients.length > 0) {
+      const found = clients.find(c => c.id === clienteId)
+      if (found) setSelected(found)
+    }
+  }, [router.query.cliente, clients])
 
   async function fetchClients() {
     const res = await fetch('/api/clients')
@@ -108,7 +121,7 @@ export default function HomePage() {
   }
 
   function getHealthStatusKey(c: any) {
-    return healthPorCliente[c.id]?.status || 'implantacao'
+    return healthPorCliente[c.id]?.projeto?.status || 'implantacao'
   }
 
   async function fetchSuabase() {
@@ -193,7 +206,7 @@ export default function HomePage() {
         }
       >
         {selected ? (
-          <ClientDetail client={selected} onUpdate={handleUpdateClient} />
+          <ClientDetail client={selected} onUpdate={handleUpdateClient} initialTab={typeof router.query.tab === 'string' ? router.query.tab : undefined} />
         ) : (
           <div style={{maxWidth:1400, margin:'0 auto'}}>
 
@@ -337,7 +350,7 @@ export default function HomePage() {
                   const ltvExtra = (c.monetizacoes || []).reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
                   const isExpiring = c.fimContrato && new Date(c.fimContrato).getTime() - new Date().getTime() < 30 * 864e5
                   const statusColor = c.status === 'ativo' ? C.green : c.status === 'churn' ? C.red : C.amber
-                  const hStatus = healthPorCliente[c.id]
+                  const hStatus = healthPorCliente[c.id]?.projeto
                   const hMeta = healthMeta(hStatus?.status)
                   const atrasados = planosAtrasadosPorCliente[c.id] || 0
 

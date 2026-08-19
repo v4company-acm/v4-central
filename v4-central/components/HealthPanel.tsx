@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Dominio, DOMINIO_CONFIG, healthMeta, fmtMetricValue,
   computeDomainScore, computeProjetoScore, MetricResult,
+  PROJETO_CHECKLIST, computeAlertSignals, ChecklistAnswers,
 } from '../lib/health'
 
 function fmtDate(d?: string | null) {
@@ -63,6 +64,7 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   const [formOpen, setFormOpen] = useState(false)
   const [comercialAtuais, setComercialAtuais] = useState<Record<string, string>>({})
   const [playbook, setPlaybook] = useState<'sim' | 'parcial' | 'nao'>('sim')
+  const [projetoChecklist, setProjetoChecklist] = useState<ChecklistAnswers>({})
   const [autor, setAutor] = useState(autorPadrao || '')
   const [dataRef, setDataRef] = useState(todayISO())
   const [observacao, setObservacao] = useState('')
@@ -123,6 +125,13 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   const displayScore = currentForDominio.last?.score ?? currentForDominio.calc.score
   const meta = healthMeta(displayStatus)
 
+  // Sinais de atenção do checklist de Projeto — ao vivo (form aberto) e do último registro salvo
+  const alertSignalsLive = useMemo(() => computeAlertSignals(projetoChecklist, playbook), [projetoChecklist, playbook])
+  const lastProjeto = latestByDominio('projeto')
+  const alertSignalsSaved = lastProjeto?.metricas?.alertas != null
+    ? { alertas: lastProjeto.metricas.alertas, total: lastProjeto.metricas.total }
+    : null
+
   const planosPendentes = plans.filter(p => p.status === 'pendente')
   const planosDominio = dominio === 'projeto' ? planosPendentes : planosPendentes.filter(p => p.dominio === dominio)
   const planosAtrasados = planosPendentes.filter(p => p.prazo < todayISO())
@@ -152,7 +161,7 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
   function abrirForm() {
     setAutor(autorPadrao || ''); setDataRef(todayISO()); setObservacao('')
     if (dominio === 'comercial') setComercialAtuais({})
-    if (dominio === 'projeto') setPlaybook('sim')
+    if (dominio === 'projeto') { setPlaybook('sim'); setProjetoChecklist({}) }
     setFormOpen(true)
   }
 
@@ -163,7 +172,7 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
     const body = {
       cliente_id: client.id, dominio, data: dataRef, autor: autor.trim(),
       score: calc.score, status: calc.status,
-      metricas: dominio === 'projeto' ? [] : (calc as any).metrics,
+      metricas: dominio === 'projeto' ? { checklist: projetoChecklist, ...alertSignalsLive } : (calc as any).metrics,
       playbook_em_dia: dominio === 'projeto' ? playbook : null,
       observacao: observacao.trim() || null,
     }
@@ -245,6 +254,17 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
             </div>
           )}
         </div>
+        {dominio === 'projeto' && (() => {
+          const sig = alertSignalsSaved || alertSignalsLive
+          const sigColor = sig.alertas === 0 ? '#16A34A' : sig.alertas <= 2 ? '#D97706' : '#FB2E0A'
+          return (
+            <div style={{ textAlign: 'center', padding: '0 12px', borderLeft: `1px solid ${meta.color}33` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Sinais de Atenção</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: sigColor }}>{sig.alertas}<span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 700 }}>/{sig.total}</span></div>
+              {!alertSignalsSaved && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>ao vivo</div>}
+            </div>
+          )
+        })()}
         <div style={{ flex: 1 }} />
         <button className="btn btn-sm" onClick={() => setMetasOpen(o => !o)}>Metas</button>
         {!formOpen && <button className="btn btn-primary btn-sm" onClick={abrirForm}>+ Registrar {dominio === 'projeto' ? 'Avaliação' : 'Check'}</button>}
@@ -335,6 +355,34 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
                     color: playbook === o.k ? 'var(--red)' : 'var(--text-secondary)',
                   }}>{o.l}</button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {dominio === 'projeto' && (
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-main)', display: 'block', marginBottom: 8 }}>
+                Checklist de Saúde (mesmos critérios da planilha de Account Plan)
+              </label>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {PROJETO_CHECKLIST.map(item => (
+                  <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 12px', background: 'var(--card-color)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      {[{ k: 'sim', l: 'Sim' }, { k: 'nao', l: 'Não' }].map(o => (
+                        <button key={o.k} type="button" onClick={() => setProjetoChecklist(p => ({ ...p, [item.key]: p[item.key] === o.k ? null : o.k as 'sim' | 'nao' }))} style={{
+                          padding: '4px 12px', borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          border: projetoChecklist[item.key] === o.k ? '1.5px solid var(--red)' : '1px solid var(--border-color)',
+                          background: projetoChecklist[item.key] === o.k ? 'rgba(251,46,10,0.1)' : 'var(--hover-bg)',
+                          color: projetoChecklist[item.key] === o.k ? 'var(--red)' : 'var(--text-muted)',
+                        }}>{o.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                Sinais de atenção neste registro: <strong style={{ color: 'var(--text-secondary)' }}>{alertSignalsLive.alertas} de {alertSignalsLive.total}</strong>
               </div>
             </div>
           )}
@@ -432,13 +480,29 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(chk.data)}</span>
                   {chk.playbook_em_dia && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Playbook: {chk.playbook_em_dia}</span>}
                 </div>
-                {chk.metricas?.length > 0 && (
+                {chk.dominio !== 'projeto' && Array.isArray(chk.metricas) && chk.metricas.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     {chk.metricas.map((m: MetricResult) => (
                       <span key={m.key} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: 'var(--hover-bg)', color: 'var(--text-secondary)' }}>
                         {m.label}: {fmtMetricValue(m.atual, m.unidade)}{m.atingimento != null ? ` (${Math.round(m.atingimento)}%)` : ''}
                       </span>
                     ))}
+                  </div>
+                )}
+                {chk.dominio === 'projeto' && chk.metricas?.alertas != null && (
+                  <div style={{ marginTop: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: chk.metricas.alertas === 0 ? '#16A34A' : chk.metricas.alertas <= 2 ? '#D97706' : '#FB2E0A' }}>
+                      {chk.metricas.alertas} de {chk.metricas.total} sinais de atenção
+                    </span>
+                    {chk.metricas.checklist && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {PROJETO_CHECKLIST.filter(item => chk.metricas.checklist[item.key] === 'nao').map(item => (
+                          <span key={item.key} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: 'rgba(251,46,10,0.1)', color: 'var(--red)' }}>
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {chk.observacao && <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>{chk.observacao}</div>}
