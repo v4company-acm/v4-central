@@ -37,5 +37,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(201).json({ check: row })
   }
 
+  if (req.method === 'DELETE') {
+    if ((session.user as any)?.role !== 'admin') return res.status(403).json({ error: 'Só administradores podem excluir registros de Health Score' })
+    const { id } = req.query
+    if (!id) return res.status(400).json({ error: 'id obrigatório' })
+    const { error } = await supabase.from('health_checks').delete().eq('id', id as string)
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ ok: true })
+  }
+
   res.status(405).end()
 }

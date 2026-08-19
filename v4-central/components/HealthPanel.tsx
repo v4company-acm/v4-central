@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   Dominio, DOMINIO_CONFIG, healthMeta, fmtMetricValue,
   computeDomainScore, computeProjetoScore, MetricResult,
@@ -57,6 +58,8 @@ interface Props {
 }
 
 export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Props) {
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === 'admin'
   const [dominio, setDominio] = useState<Dominio>('trafego')
   const [checks, setChecks] = useState<any[]>([])
   const [plans, setPlans] = useState<any[]>([])
@@ -223,6 +226,13 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
     } else {
       alert('Erro ao salvar. Tenta de novo.')
     }
+  }
+
+  async function excluirCheck(id: number) {
+    if (!confirm('Excluir este registro de Health Score permanentemente? Não dá pra desfazer.')) return
+    const res = await fetch(`/api/health-checks?id=${id}`, { method: 'DELETE' })
+    if (res.ok) setChecks(p => p.filter(c => c.id !== id))
+    else alert('Não consegui excluir. Tenta de novo.')
   }
 
   async function salvarPlano() {
@@ -535,11 +545,18 @@ export default function HealthPanel({ client, onUpdateClient, autorPadrao }: Pro
             const cm = healthMeta(chk.status)
             return (
               <div key={chk.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '14px 18px', borderLeft: `4px solid ${cm.color}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: cm.bg, color: cm.color, textTransform: 'uppercase' }}>{cm.label}</span>
-                  {chk.score != null && <span style={{ fontSize: 11, fontWeight: 700, color: cm.color }}>{chk.score}/100</span>}
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(chk.data)}</span>
-                  {chk.playbook_em_dia && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Playbook: {chk.playbook_em_dia}</span>}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: cm.bg, color: cm.color, textTransform: 'uppercase' }}>{cm.label}</span>
+                    {chk.score != null && <span style={{ fontSize: 11, fontWeight: 700, color: cm.color }}>{chk.score}/100</span>}
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(chk.data)}</span>
+                    {chk.playbook_em_dia && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Playbook: {chk.playbook_em_dia}</span>}
+                  </div>
+                  {isAdmin && (
+                    <button onClick={() => excluirCheck(chk.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                      title="Excluir registro">✕</button>
+                  )}
                 </div>
                 {chk.dominio !== 'projeto' && Array.isArray(chk.metricas) && chk.metricas.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
