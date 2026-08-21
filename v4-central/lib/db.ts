@@ -47,6 +47,7 @@ function toRow(c: any) {
     roi_roas_checks:   c.roiRoasChecks ?? [],
     metas:             c.metas         ?? {},
     resultados_cliente_id: c.resultadosClienteId || null,
+    servicos:          c.servicos      ?? [],
   }
 }
 
@@ -92,6 +93,7 @@ function fromRow(r: any) {
     roiRoasChecks:     r.roi_roas_checks    ?? [],
     metas:             r.metas             ?? {},
     resultadosClienteId: r.resultados_cliente_id || null,
+    servicos:          r.servicos          ?? [],
   }
 }
 

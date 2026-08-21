@@ -33,7 +33,7 @@ export default function ClientDetail({ client: c, onUpdate, initialTab }: Props)
   const [metForm, setMetForm] = useState(false)
   const [mfields, setMfields] = useState<any>({roas:'',cpl:'',leads:'',invest:'',roi:'',vendas:'',totalVendido:'',data:new Date().toISOString().slice(0,10)})
 
-  const cats = [c.catSaber&&'Saber',c.catTer&&'Ter',c.catExecutar&&'Executar'].filter(Boolean).join(', ')||'—'
+  const servicos: string[] = c.servicos || []
   const historico: any[] = c.metricasHistorico || []
 
   // Health Score — puxa o check de Projeto mais recente só pro tile do cabeçalho
@@ -193,10 +193,23 @@ export default function ClientDetail({ client: c, onUpdate, initialTab }: Props)
               <div className="sec-title" style={{fontSize:16, borderBottom:'2px solid var(--border-color)', paddingBottom:8, marginBottom:16}}>Contexto do Projeto</div>
               <div className="info-row"><span className="info-key">Data de Entrada</span><span className="info-val">{fmtDate(c.dataEntrada)}</span></div>
               <div className="info-row"><span className="info-key">Cohort</span><span className="info-val">{c.cohort||'—'}</span></div>
-              <div className="info-row"><span className="info-key">Produtos</span><span className="info-val">{cats}</span></div>
               <div className="info-row"><span className="info-key">Canais de Mídia</span><span className="info-val">{c.canais||'—'}</span></div>
             </div>
           </div>
+
+          <div style={{marginTop:24}}>
+            <div className="sec-title" style={{fontSize:16, borderBottom:'2px solid var(--border-color)', paddingBottom:8, marginBottom:16}}>Serviços Contratados</div>
+            {servicos.length === 0 ? (
+              <div style={{fontSize:13, color:'var(--text-muted)'}}>Nenhum serviço cadastrado — edite o cadastro pra listar o que está incluso no contrato.</div>
+            ) : (
+              <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+                {servicos.map(s => (
+                  <span key={s} style={{background:'var(--hover-bg)', border:'1px solid var(--border-color)', borderRadius:20, padding:'6px 14px', fontSize:13, fontWeight:600, color:'var(--text-main)'}}>{s}</span>
+                ))}
+              </div>
+            )}
+          </div>
+
           {c.descricao&&c.descricao!=='-'&&<div style={{marginTop:24, background:'var(--hover-bg)', padding:16, borderRadius:8, borderLeft:'4px solid var(--border-color)'}}><strong style={{display:'block', marginBottom:4}}>Sobre o projeto:</strong>{c.descricao}</div>}
           {c.promessa&&c.promessa!=='-'&&<div style={{marginTop:12, background:'rgba(251,46,10,0.08)', padding:16, borderRadius:8, borderLeft:'4px solid #FB2E0A'}}><strong style={{display:'block', marginBottom:4, color:'#FB2E0A'}}>Alinhamento e Promessas:</strong>{c.promessa}</div>}
         </>}

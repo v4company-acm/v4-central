@@ -13,11 +13,23 @@ export default function ClientForm({ initial, onSave, onCancel, loading }: Props
     linkContrato:'', linkCall:'', linkTranscricao:'', linkV4:'', linkBant:'',
     canalOrigem:'', instagram:'', site:'', cohort:'', promessa:'', descricao:'',
     canais:'', catSaber:false, catTer:false, catExecutar:false,
+    servicos: [] as string[],
   })
+  const [servicoInput, setServicoInput] = useState('')
 
   useEffect(() => { if (initial) setF({ ...f, ...initial }) }, [])
 
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }))
+
+  function addServico() {
+    const v = servicoInput.trim()
+    if (!v || f.servicos.includes(v)) return setServicoInput('')
+    set('servicos', [...f.servicos, v])
+    setServicoInput('')
+  }
+  function removeServico(v: string) {
+    set('servicos', f.servicos.filter(s => s !== v))
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -109,12 +121,23 @@ export default function ClientForm({ initial, onSave, onCancel, loading }: Props
             <div className="field"><label>Promessas fora do escopo</label><textarea value={f.promessa} onChange={e=>set('promessa',e.target.value)} /></div>
             <div className="field"><label>Sobre o projeto / cliente</label><textarea value={f.descricao} onChange={e=>set('descricao',e.target.value)} /></div>
           </div>
-          <div className="field"><label>Produtos contratados</label>
-            <div className="chk-group">
-              <label className="chk-item"><input type="checkbox" checked={f.catSaber} onChange={e=>set('catSaber',e.target.checked)} /> Saber</label>
-              <label className="chk-item"><input type="checkbox" checked={f.catTer} onChange={e=>set('catTer',e.target.checked)} /> Ter</label>
-              <label className="chk-item"><input type="checkbox" checked={f.catExecutar} onChange={e=>set('catExecutar',e.target.checked)} /> Executar</label>
+          <div className="field"><label>Serviços contratados</label>
+            <div style={{display:'flex', gap:8}}>
+              <input value={servicoInput} onChange={e=>setServicoInput(e.target.value)}
+                onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); addServico() } }}
+                placeholder="Ex: Gestão de Tráfego, Social Media..." style={{flex:1}} />
+              <button type="button" className="btn btn-sm" onClick={addServico}>+ Adicionar</button>
             </div>
+            {f.servicos.length > 0 && (
+              <div style={{display:'flex', flexWrap:'wrap', gap:6, marginTop:8}}>
+                {f.servicos.map(s => (
+                  <span key={s} style={{display:'inline-flex', alignItems:'center', gap:4, background:'var(--hover-bg)', border:'1px solid var(--border-color)', borderRadius:20, padding:'4px 6px 4px 12px', fontSize:12, fontWeight:600, color:'var(--text-main)'}}>
+                    {s}
+                    <button type="button" onClick={()=>removeServico(s)} title="Remover" style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:14, lineHeight:1, padding:'0 4px'}}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="field" style={{marginTop:8}}><label>Canais de mídia ativos</label><input value={f.canais} onChange={e=>set('canais',e.target.value)} placeholder="Ex: Meta Ads, Google Ads" /></div>
         </div>
