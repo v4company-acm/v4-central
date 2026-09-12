@@ -21,3 +21,4 @@ export const SearchIcon = (p: Props) => <Svg {...p}><circle cx="11" cy="11" r="7
 export const PlusIcon = (p: Props) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>
 export const ArrowRightIcon = (p: Props) => <Svg {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Svg>
 export const ActivityIcon = (p: Props) => <Svg {...p}><path d="M3 12h4l2-7 4 14 2-7h6" /></Svg>
+export const CalendarIcon = (p: Props) => <Svg {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Svg>

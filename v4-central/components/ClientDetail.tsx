@@ -1,5 +1,6 @@
 import MetricsDashboard from './MetricsDashboard'
 import HealthPanel from './HealthPanel'
+import PlaybookPanel from './PlaybookPanel'
 import { healthMeta } from '../lib/health'
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
@@ -12,6 +13,7 @@ function fmtNum(v: any) { if(!v&&v!==0) return '—'; return Number(v).toLocaleS
 const TABS = [
   {k:'dados',l:'Visão Geral'},
   {k:'health',l:'Health Score'},
+  {k:'playbook',l:'Playbook'},
   {k:'atividades',l:'Histórico (Feed)'},
   {k:'metricas',l:'Métricas e Dash'},
   {k:'monetizacoes',l:'Monetizações'},
@@ -217,6 +219,11 @@ export default function ClientDetail({ client: c, onUpdate, initialTab }: Props)
         {/* ABA: HEALTH SCORE */}
         {tab==='health' && (
           <HealthPanel client={c} onUpdateClient={onUpdate} />
+        )}
+
+        {/* ABA: PLAYBOOK */}
+        {tab==='playbook' && (
+          <PlaybookPanel client={c} />
         )}
 
         {/* ABA: HISTÓRICO (TIMELINE UNIFICADA) */}

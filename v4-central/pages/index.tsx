@@ -7,7 +7,7 @@ import Layout from '../components/Layout'
 import ClientForm from '../components/ClientForm'
 import ClientDetail from '../components/ClientDetail'
 import { healthMeta } from '../lib/health'
-import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon, ActivityIcon } from '../components/Icon'
+import { GridIcon, ClipboardIcon, FileTextIcon, ClockIcon, TrendingUpIcon, BarChartIcon, FolderIcon, LayersIcon, SearchIcon, PlusIcon, ArrowRightIcon, ActivityIcon, CalendarIcon } from '../components/Icon'
 
 const C = {
   bg: 'var(--bg-color)',
@@ -44,6 +44,7 @@ const TOOLS = [
   { label:'Gestão de Projetos', Icon:FolderIcon,    href:'/gestao-projetos' },
   { label:'Account Plan',       Icon:LayersIcon,    href:'/account-plan' },
   { label:'Health Score',       Icon:ActivityIcon,  href:'/health-score' },
+  { label:'Playbook',           Icon:CalendarIcon,  href:'/playbook' },
 ]
 
 async function sbQuery(table: string, qs = '') {
@@ -92,8 +93,9 @@ export default function HomePage() {
   const [tarefasAtraso, setTarefasAtraso] = useState<any[]>([])
   const [healthPorCliente, setHealthPorCliente] = useState<Record<string, any>>({})
   const [planosAtrasadosPorCliente, setPlanosAtrasadosPorCliente] = useState<Record<string, number>>({})
+  const [playbookPorCliente, setPlaybookPorCliente] = useState<Record<string, any>>({})
 
-  useEffect(() => { fetchClients(); fetchSuabase(); fetchHealthSummary() }, [])
+  useEffect(() => { fetchClients(); fetchSuabase(); fetchHealthSummary(); fetchPlaybookSummary() }, [])
 
   // Deep-link vindo de outras telas (ex: Health Score) — ?cliente=<id> seleciona
   // o card automaticamente ao carregar, sem precisar clicar de novo na grade.
@@ -122,6 +124,15 @@ export default function HomePage() {
 
   function getHealthStatusKey(c: any) {
     return healthPorCliente[c.id]?.projeto?.status || 'implantacao'
+  }
+
+  async function fetchPlaybookSummary() {
+    try {
+      const res = await fetch('/api/playbook-summary', { cache: 'no-store' })
+      if (!res.ok) return
+      const d = await res.json()
+      setPlaybookPorCliente(d.porCliente || {})
+    } catch (e) {}
   }
 
   async function fetchSuabase() {
@@ -180,6 +191,8 @@ export default function HomePage() {
   const healthSaudavelCount = clients.filter(c => getHealthStatusKey(c) === 'saudavel').length
   const healthCriticoCount = clients.filter(c => getHealthStatusKey(c) === 'critico').length
   const planosAtrasadosTotal = Object.values(planosAtrasadosPorCliente).reduce((s: number, n: any) => s + Number(n || 0), 0)
+  const playbookAtrasadosTotal = Object.values(playbookPorCliente).reduce((s: number, p: any) => s + Number(p?.atrasados || 0), 0)
+  const semPlaybookTotal = clients.filter(c => !(playbookPorCliente[c.id]?.regrasAtivas > 0)).length
 
   // Clientes com Google Ads configurado (para o card de Performance)
   const clientesComGA = clients.filter(c => c.id && [
@@ -220,6 +233,8 @@ export default function HomePage() {
                 { label:'Health Saudável',  value:healthSaudavelCount,  accent:C.green },
                 { label:'Health Crítico',   value:healthCriticoCount,   accent:healthCriticoCount > 0 ? C.red : C.text3 },
                 { label:'Planos Atrasados', value:planosAtrasadosTotal, accent:planosAtrasadosTotal > 0 ? C.red : C.text3 },
+                { label:'Playbook Atrasado',value:playbookAtrasadosTotal, accent:playbookAtrasadosTotal > 0 ? C.red : C.text3 },
+                { label:'Sem Playbook',     value:semPlaybookTotal,     accent:semPlaybookTotal > 0 ? C.amber : C.text3 },
                 { label:'MRR Consolidado',  value:fmtR(mrrTotal),       isMoney:true, dark:true },
                 { label:'Upsell (LTV Extra)',value:fmtR(totalMonetizado),isMoney:true, dark:true },
               ].map((k: any, i) => (
@@ -353,6 +368,9 @@ export default function HomePage() {
                   const hStatus = healthPorCliente[c.id]?.projeto
                   const hMeta = healthMeta(hStatus?.status)
                   const atrasados = planosAtrasadosPorCliente[c.id] || 0
+                  const pb = playbookPorCliente[c.id]
+                  const pbAtrasados = pb?.atrasados || 0
+                  const semPlaybook = !(pb?.regrasAtivas > 0)
 
                   return (
                     <div key={c.id} onClick={() => setSelected(c)} style={{
@@ -391,6 +409,16 @@ export default function HomePage() {
                           {atrasados > 0 && (
                             <div style={{display:'inline-flex', alignItems:'center', gap:4, background:'rgba(251,46,10,0.1)', color:C.red, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20}}>
                               {atrasados} plano{atrasados > 1 ? 's' : ''} atrasado{atrasados > 1 ? 's' : ''}
+                            </div>
+                          )}
+                          {pbAtrasados > 0 && (
+                            <div style={{display:'inline-flex', alignItems:'center', gap:4, background:'rgba(251,46,10,0.1)', color:C.red, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20}}>
+                              {pbAtrasados} entrega{pbAtrasados > 1 ? 's' : ''} atrasada{pbAtrasados > 1 ? 's' : ''}
+                            </div>
+                          )}
+                          {semPlaybook && (
+                            <div style={{display:'inline-flex', alignItems:'center', gap:4, background:C.amberBg, color:C.amber, fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20}}>
+                              Sem Playbook
                             </div>
                           )}
                         </div>

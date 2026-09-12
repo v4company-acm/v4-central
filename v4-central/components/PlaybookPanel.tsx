@@ -1,0 +1,315 @@
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  PlaybookTipo, TIPOS_ORDENADOS, TIPO_META, FREQ_LABEL, DIAS_SEMANA,
+  PLAYBOOK_PRESETS, sugerirPresets, fmtCadencia, fmtDate, todayISO, isAtrasado,
+} from '../lib/playbook'
+
+interface Props { client: any; autorPadrao?: string }
+
+const NOVA_REGRA_DEFAULT = { titulo: '', descricao: '', tipo: 'relatorio' as PlaybookTipo, frequencia: 'semanal' as 'semanal' | 'quinzenal' | 'mensal' | 'unico', dia_semana: 1, dia_mes: 1, responsavel: '', data_inicio: todayISO() }
+const NOVO_AVULSO_DEFAULT = { titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: todayISO(), responsavel: '' }
+
+function MesLabel(dataISO: string) {
+  const [y, m] = dataISO.split('-')
+  const nomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+  return `${nomes[parseInt(m, 10) - 1]} ${y}`
+}
+
+export default function PlaybookPanel({ client, autorPadrao }: Props) {
+  const [regras, setRegras] = useState<any[]>([])
+  const [itens, setItens] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [regraFormOpen, setRegraFormOpen] = useState(false)
+  const [regraForm, setRegraForm] = useState<any>(NOVA_REGRA_DEFAULT)
+  const [avulsoFormOpen, setAvulsoFormOpen] = useState(false)
+  const [avulsoForm, setAvulsoForm] = useState<any>(NOVO_AVULSO_DEFAULT)
+  const [autor, setAutor] = useState(autorPadrao || '')
+  const [confirmandoId, setConfirmandoId] = useState<number | null>(null)
+  const [obsConfirm, setObsConfirm] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      await fetch('/api/playbook-gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente_id: client.id }) })
+      const [rRes, iRes] = await Promise.all([
+        fetch(`/api/playbook-regras?cliente_id=${client.id}`, { cache: 'no-store' }),
+        fetch(`/api/playbook-itens?cliente_id=${client.id}`, { cache: 'no-store' }),
+      ])
+      if (rRes.ok) setRegras((await rRes.json()).regras || [])
+      if (iRes.ok) setItens((await iRes.json()).itens || [])
+    } catch (e) {
+      console.error('Erro ao carregar Playbook:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [client.id])
+
+  useEffect(() => { load() }, [load])
+
+  const sugestoes = useMemo(() => sugerirPresets(client.servicos || []), [client.servicos])
+  const titulosExistentes = useMemo(() => new Set(regras.filter(r => r.ativo).map(r => r.titulo)), [regras])
+
+  const pendentes = itens.filter(i => i.status === 'pendente')
+  const atrasados = pendentes.filter(isAtrasado)
+  const proximosMeses = pendentes.filter(i => !isAtrasado(i))
+
+  const porMes: Record<string, any[]> = {}
+  proximosMeses.forEach(i => { const k = i.data_prevista.slice(0, 7); (porMes[k] = porMes[k] || []).push(i) })
+  const meses = Object.keys(porMes).sort()
+
+  function usarPreset(p: typeof PLAYBOOK_PRESETS[number]) {
+    setRegraForm({ titulo: p.titulo, descricao: '', tipo: p.tipo, frequencia: p.frequencia, dia_semana: p.dia_semana ?? 1, dia_mes: p.dia_mes ?? 1, responsavel: '', data_inicio: todayISO() })
+    setRegraFormOpen(true)
+  }
+
+  async function salvarRegra() {
+    if (!regraForm.titulo.trim()) return alert('Dê um título pra essa regra.')
+    if (!autor.trim()) return alert('Informe quem está cadastrando.')
+    const body = {
+      cliente_id: client.id, titulo: regraForm.titulo.trim(), descricao: regraForm.descricao.trim() || null,
+      tipo: regraForm.tipo, frequencia: regraForm.frequencia,
+      dia_semana: ['semanal', 'quinzenal'].includes(regraForm.frequencia) ? regraForm.dia_semana : null,
+      dia_mes: regraForm.frequencia === 'mensal' ? regraForm.dia_mes : null,
+      responsavel: regraForm.responsavel.trim() || null, data_inicio: regraForm.data_inicio, criado_por: autor.trim(),
+    }
+    const res = await fetch('/api/playbook-regras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (res.ok) { await load(); setRegraFormOpen(false); setRegraForm(NOVA_REGRA_DEFAULT) }
+    else { const d = await res.json().catch(() => ({})); alert(`Erro ao salvar: ${d.error || 'tenta de novo.'}`) }
+  }
+
+  async function desativarRegra(id: number) {
+    if (!confirm('Desativar essa regra? As entregas futuras ainda pendentes dela serão canceladas (o que já foi entregue continua no histórico).')) return
+    const res = await fetch('/api/playbook-regras', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ativo: false }) })
+    if (res.ok) await load()
+  }
+
+  async function excluirRegra(id: number) {
+    if (!confirm('Excluir essa regra permanentemente? O histórico de entregas continua registrado, só a regra em si some.')) return
+    const res = await fetch(`/api/playbook-regras?id=${id}`, { method: 'DELETE' })
+    if (res.ok) await load()
+  }
+
+  async function salvarAvulso() {
+    if (!avulsoForm.titulo.trim()) return alert('Dê um título pro compromisso.')
+    if (!autor.trim()) return alert('Informe quem está cadastrando.')
+    const body = { cliente_id: client.id, titulo: avulsoForm.titulo.trim(), tipo: avulsoForm.tipo, data_prevista: avulsoForm.data_prevista, responsavel: avulsoForm.responsavel.trim() || null, criado_por: autor.trim() }
+    const res = await fetch('/api/playbook-itens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (res.ok) { await load(); setAvulsoFormOpen(false); setAvulsoForm(NOVO_AVULSO_DEFAULT) }
+    else { const d = await res.json().catch(() => ({})); alert(`Erro ao salvar: ${d.error || 'tenta de novo.'}`) }
+  }
+
+  async function marcarEntregue(id: number) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'entregue', observacao: obsConfirm.trim() || null }) })
+    if (res.ok) { await load(); setConfirmandoId(null); setObsConfirm('') }
+  }
+
+  async function reabrirItem(id: number) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'pendente' }) })
+    if (res.ok) await load()
+  }
+
+  async function excluirItem(id: number) {
+    if (!confirm('Excluir esse compromisso permanentemente?')) return
+    const res = await fetch(`/api/playbook-itens?id=${id}`, { method: 'DELETE' })
+    if (res.ok) await load()
+  }
+
+  function ItemRow({ item }: { item: any }) {
+    const meta = TIPO_META[item.tipo as PlaybookTipo]
+    const atrasado = isAtrasado(item)
+    const cor = item.status === 'entregue' ? '#16A34A' : atrasado ? '#FB2E0A' : 'var(--border-color)'
+    return (
+      <div style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '12px 16px', borderLeft: `4px solid ${cor}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ width: 78, flexShrink: 0, fontSize: 12, fontWeight: 700, color: atrasado ? '#FB2E0A' : 'var(--text-secondary)' }}>{fmtDate(item.data_prevista)}</div>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: meta.bg, color: meta.color, textTransform: 'uppercase', flexShrink: 0 }}>{meta.label}</span>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{item.titulo}</div>
+          {item.responsavel && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.responsavel}</div>}
+          {item.observacao && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{item.observacao}</div>}
+        </div>
+        {item.status === 'entregue' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#16A34A' }}>Entregue {item.data_entrega ? `em ${fmtDate(item.data_entrega)}` : ''}</span>
+            <button className="btn btn-sm" onClick={() => reabrirItem(item.id)}>Reabrir</button>
+          </div>
+        ) : confirmandoId === item.id ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input value={obsConfirm} onChange={e => setObsConfirm(e.target.value)} placeholder="Observação (opcional)" style={{ height: 32, fontSize: 12, width: 160 }} />
+            <button className="btn btn-sm" onClick={() => { setConfirmandoId(null); setObsConfirm('') }}>Cancelar</button>
+            <button className="btn btn-sm btn-primary" onClick={() => marcarEntregue(item.id)}>Confirmar</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {atrasado && <span style={{ fontSize: 10, fontWeight: 800, color: '#FB2E0A', alignSelf: 'center' }}>ATRASADO</span>}
+            <button className="btn btn-sm btn-primary" onClick={() => setConfirmandoId(item.id)}>Marcar Entregue</button>
+            <button onClick={() => excluirItem(item.id)} title="Excluir" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* ── STAT STRIP ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, marginBottom: 20, background: 'var(--border-color)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+        {[
+          { label: 'Regras Ativas', value: regras.filter(r => r.ativo).length, accent: 'var(--text-muted)' },
+          { label: 'Entregas nos Próx. 3 Meses', value: proximosMeses.length, accent: '#2563EB' },
+          { label: 'Atrasadas', value: atrasados.length, accent: atrasados.length > 0 ? '#FB2E0A' : 'var(--text-muted)' },
+        ].map((k, i) => (
+          <div key={i} style={{ background: 'var(--card-color)', padding: '14px 18px', borderTop: `2px solid ${k.accent}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {atrasados.length > 0 && (
+        <div style={{ background: 'rgba(251,46,10,0.08)', border: '1px solid rgba(251,46,10,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 12, color: '#FB2E0A', fontWeight: 600 }}>
+          ⚠ {atrasados.length} entrega(s) atrasada(s) — role até "Linha do Tempo" pra confirmar ou reagendar.
+        </div>
+      )}
+
+      {regras.length === 0 && !loading && (
+        <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '14px 18px', marginBottom: 20, fontSize: 12, color: '#2563EB' }}>
+          Esse cliente ainda não tem playbook definido. Use as sugestões abaixo ou crie uma regra do zero pra começar a gerar o calendário dos próximos 3 meses.
+        </div>
+      )}
+
+      {/* ── SUGESTÕES RÁPIDAS ── */}
+      <div className="sec-title" style={{ fontSize: 14 }}>Sugestões Rápidas</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        {sugestoes.map(p => {
+          const jaTem = titulosExistentes.has(p.titulo)
+          return (
+            <button key={p.titulo} disabled={jaTem} onClick={() => usarPreset(p)} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+              border: '1px solid var(--border-color)', background: jaTem ? 'var(--hover-bg)' : 'var(--card-color)',
+              color: jaTem ? 'var(--text-muted)' : 'var(--text-main)', cursor: jaTem ? 'default' : 'pointer', opacity: jaTem ? 0.6 : 1,
+            }}>
+              {jaTem ? '✓' : '+'} {p.titulo}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── REGRAS RECORRENTES ── */}
+      <div className="sec-title" style={{ fontSize: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Regras Recorrentes</span>
+        {!regraFormOpen && <button className="btn btn-sm btn-primary" onClick={() => { setRegraForm(NOVA_REGRA_DEFAULT); setRegraFormOpen(true) }}>+ Nova Regra</button>}
+      </div>
+
+      {regraFormOpen && (
+        <div style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 20, marginBottom: 20 }}>
+          <div className="form-grid-2">
+            <div className="field"><label>Título *</label><input value={regraForm.titulo} onChange={e => setRegraForm((p: any) => ({ ...p, titulo: e.target.value }))} placeholder="Ex: Relatório Semanal" /></div>
+            <div className="field"><label>Tipo</label>
+              <select value={regraForm.tipo} onChange={e => setRegraForm((p: any) => ({ ...p, tipo: e.target.value }))}>
+                {TIPOS_ORDENADOS.map(t => <option key={t} value={t}>{TIPO_META[t].label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-grid-3">
+            <div className="field"><label>Frequência</label>
+              <select value={regraForm.frequencia} onChange={e => setRegraForm((p: any) => ({ ...p, frequencia: e.target.value }))}>
+                {Object.entries(FREQ_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+            {['semanal', 'quinzenal'].includes(regraForm.frequencia) && (
+              <div className="field"><label>Dia da semana</label>
+                <select value={regraForm.dia_semana} onChange={e => setRegraForm((p: any) => ({ ...p, dia_semana: parseInt(e.target.value) }))}>
+                  {DIAS_SEMANA.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                </select>
+              </div>
+            )}
+            {regraForm.frequencia === 'mensal' && (
+              <div className="field"><label>Dia do mês</label><input type="number" min={1} max={31} value={regraForm.dia_mes} onChange={e => setRegraForm((p: any) => ({ ...p, dia_mes: parseInt(e.target.value) || 1 }))} /></div>
+            )}
+            {regraForm.frequencia === 'unico' && (
+              <div className="field"><label>Data</label><input type="date" value={regraForm.data_inicio} onChange={e => setRegraForm((p: any) => ({ ...p, data_inicio: e.target.value }))} /></div>
+            )}
+            <div className="field"><label>Responsável</label><input value={regraForm.responsavel} onChange={e => setRegraForm((p: any) => ({ ...p, responsavel: e.target.value }))} placeholder="Nome" /></div>
+          </div>
+          {regraForm.frequencia !== 'unico' && (
+            <div className="field"><label>Começar a partir de</label><input type="date" value={regraForm.data_inicio} onChange={e => setRegraForm((p: any) => ({ ...p, data_inicio: e.target.value }))} /></div>
+          )}
+          <div className="field"><label>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-sm" onClick={() => setRegraFormOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={salvarRegra}>Salvar Regra</button>
+          </div>
+        </div>
+      )}
+
+      {regras.filter(r => r.ativo).length === 0 ? (
+        <div className="empty" style={{ marginBottom: 24 }}>Nenhuma regra ativa.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8, marginBottom: 24 }}>
+          {regras.filter(r => r.ativo).map(r => {
+            const meta = TIPO_META[r.tipo as PlaybookTipo]
+            return (
+              <div key={r.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: meta.bg, color: meta.color, textTransform: 'uppercase' }}>{meta.label}</span>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{r.titulo}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtCadencia(r)}{r.responsavel ? ` · ${r.responsavel}` : ''}</div>
+                </div>
+                <button className="btn btn-sm" onClick={() => desativarRegra(r.id)}>Desativar</button>
+                <button onClick={() => excluirRegra(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── LINHA DO TEMPO ── */}
+      <div className="sec-title" style={{ fontSize: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Linha do Tempo — Próximos 3 Meses</span>
+        {!avulsoFormOpen && <button className="btn btn-sm" onClick={() => { setAvulsoForm(NOVO_AVULSO_DEFAULT); setAvulsoFormOpen(true) }}>+ Compromisso Avulso</button>}
+      </div>
+
+      {avulsoFormOpen && (
+        <div style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 20, marginBottom: 20 }}>
+          <div className="form-grid-4">
+            <div className="field"><label>Título *</label><input value={avulsoForm.titulo} onChange={e => setAvulsoForm((p: any) => ({ ...p, titulo: e.target.value }))} /></div>
+            <div className="field"><label>Tipo</label>
+              <select value={avulsoForm.tipo} onChange={e => setAvulsoForm((p: any) => ({ ...p, tipo: e.target.value }))}>
+                {TIPOS_ORDENADOS.map(t => <option key={t} value={t}>{TIPO_META[t].label}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Data</label><input type="date" value={avulsoForm.data_prevista} onChange={e => setAvulsoForm((p: any) => ({ ...p, data_prevista: e.target.value }))} /></div>
+            <div className="field"><label>Responsável</label><input value={avulsoForm.responsavel} onChange={e => setAvulsoForm((p: any) => ({ ...p, responsavel: e.target.value }))} /></div>
+          </div>
+          <div className="field"><label>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-sm" onClick={() => setAvulsoFormOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={salvarAvulso}>Salvar Compromisso</button>
+          </div>
+        </div>
+      )}
+
+      {atrasados.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#FB2E0A', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Atrasadas</div>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
+            {atrasados.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
+          </div>
+        </>
+      )}
+
+      {loading ? <div className="empty">Carregando...</div> : meses.length === 0 && atrasados.length === 0 ? (
+        <div className="empty">Nenhuma entrega prevista. Adicione uma regra recorrente ou um compromisso avulso.</div>
+      ) : (
+        meses.map(mes => (
+          <div key={mes} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{MesLabel(mes + '-01')}</div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {porMes[mes].sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
