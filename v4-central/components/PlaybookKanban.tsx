@@ -1,4 +1,5 @@
-import { PlaybookTipo, TIPO_META, fmtDate, isAtrasado } from '../lib/playbook'
+import { useState } from 'react'
+import { PlaybookTipo, TIPOS_ORDENADOS, TIPO_META, fmtDate, isAtrasado, diasAtraso } from '../lib/playbook'
 
 // Quadro kanban por SEMANA (não por status) — a previsibilidade que importa aqui é
 // "o que vence quando", não um fluxo de trabalho. Atrasado sempre na 1ª coluna,
@@ -34,12 +35,26 @@ interface Props {
   itens: any[]
   onMarcarEntregue: (id: number) => void
   onReabrir: (id: number) => void
+  onEditar?: (id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) => void
   mostrarCliente?: boolean
   onClickCliente?: (clienteId: string) => void
   janelaSemanas?: number // quantas colunas de semana mostrar além de "Atrasado" (default 4)
 }
 
-export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mostrarCliente, onClickCliente, janelaSemanas = 4 }: Props) {
+export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, onEditar, mostrarCliente, onClickCliente, janelaSemanas = 4 }: Props) {
+  const [editandoId, setEditandoId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: '', responsavel: '' })
+
+  function abrirEdicao(item: any) {
+    setEditForm({ titulo: item.titulo, tipo: item.tipo, data_prevista: item.data_prevista, responsavel: item.responsavel || '' })
+    setEditandoId(item.id)
+  }
+  function salvarEdicao() {
+    if (!editForm.titulo.trim() || editandoId == null) return
+    onEditar?.(editandoId, { titulo: editForm.titulo.trim(), tipo: editForm.tipo, data_prevista: editForm.data_prevista, responsavel: editForm.responsavel.trim() || null })
+    setEditandoId(null)
+  }
+
   const colunas = COLUNAS.filter(c => c.key === 'atrasado' || (c.key as number) < janelaSemanas)
 
   const porColuna: Record<string, any[]> = {}
@@ -60,7 +75,7 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mos
           <div key={col.key} style={{ minWidth: 240, maxWidth: 260, flexShrink: 0, background: 'var(--hover-bg)', borderRadius: 10, padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px 10px', borderBottom: `2px solid ${atrasadoCol ? '#FB2E0A' : 'var(--border-color)'}`, marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: atrasadoCol ? '#FB2E0A' : 'var(--text-secondary)' }}>{col.label}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>{lista.length}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: atrasadoCol && lista.length > 0 ? '#fff' : 'var(--text-muted)', background: atrasadoCol && lista.length > 0 ? '#FB2E0A' : 'transparent', padding: atrasadoCol && lista.length > 0 ? '1px 7px' : 0, borderRadius: 10 }}>{lista.length}</span>
             </div>
             {lista.length === 0 ? (
               <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '8px 4px' }}>Nada por aqui.</div>
@@ -69,6 +84,27 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mos
                 {lista.map(item => {
                   const meta = TIPO_META[item.tipo as PlaybookTipo]
                   const entregue = item.status === 'entregue'
+                  const dias = atrasadoCol ? diasAtraso(item.data_prevista) : 0
+
+                  if (editandoId === item.id) {
+                    return (
+                      <div key={item.id} style={{ background: 'var(--card-color)', border: '1.5px solid var(--red)', borderRadius: 8, padding: '10px 12px' }}>
+                        <input value={editForm.titulo} onChange={e => setEditForm(p => ({ ...p, titulo: e.target.value }))} style={{ width: '100%', fontSize: 12, marginBottom: 6, height: 30 }} />
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                          <select value={editForm.tipo} onChange={e => setEditForm(p => ({ ...p, tipo: e.target.value as PlaybookTipo }))} style={{ flex: 1, fontSize: 11, height: 30 }}>
+                            {TIPOS_ORDENADOS.map(t => <option key={t} value={t}>{TIPO_META[t].label}</option>)}
+                          </select>
+                          <input type="date" value={editForm.data_prevista} onChange={e => setEditForm(p => ({ ...p, data_prevista: e.target.value }))} style={{ flex: 1, fontSize: 11, height: 30 }} />
+                        </div>
+                        <input value={editForm.responsavel} onChange={e => setEditForm(p => ({ ...p, responsavel: e.target.value }))} placeholder="Responsável" style={{ width: '100%', fontSize: 12, marginBottom: 8, height: 30 }} />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => setEditandoId(null)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: '1px solid var(--border-color)', borderRadius: 14, padding: '4px 10px', cursor: 'pointer' }}>Cancelar</button>
+                          <button onClick={salvarEdicao} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'var(--red)', border: 'none', borderRadius: 14, padding: '4px 10px', cursor: 'pointer' }}>Salvar</button>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={item.id} style={{
                       background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '10px 12px',
@@ -78,6 +114,11 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mos
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: meta.bg, color: meta.color, textTransform: 'uppercase' }}>{meta.label}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: atrasadoCol && !entregue ? '#FB2E0A' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDate(item.data_prevista)}</span>
                       </div>
+                      {atrasadoCol && !entregue && (
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: '#FB2E0A', display: 'inline-block', padding: '2px 8px', borderRadius: 4, marginBottom: 6 }}>
+                          {dias === 0 ? 'Vence hoje' : `${dias} dia${dias > 1 ? 's' : ''} de atraso`}
+                        </div>
+                      )}
                       {mostrarCliente && (
                         <div onClick={() => onClickCliente?.(item.cliente_id)} style={{ fontSize: 10, fontWeight: 700, color: '#2563EB', marginBottom: 3, cursor: onClickCliente ? 'pointer' : 'default' }}>
                           {item.cliente_nome || 'Cliente'}
@@ -86,11 +127,16 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mos
                       {item.fase && <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 2 }}>{item.fase}</div>}
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-main)', textDecoration: entregue ? 'line-through' : 'none', marginBottom: item.responsavel ? 4 : 0 }}>{item.titulo}</div>
                       {item.responsavel && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{item.responsavel}</div>}
-                      {entregue ? (
-                        <button onClick={() => onReabrir(item.id)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✓ Entregue · reabrir</button>
-                      ) : (
-                        <button onClick={() => onMarcarEntregue(item.id)} style={{ fontSize: 10, fontWeight: 700, color: '#16A34A', background: 'none', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 14, padding: '3px 10px', cursor: 'pointer' }}>Marcar Entregue</button>
-                      )}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {entregue ? (
+                          <button onClick={() => onReabrir(item.id)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✓ Entregue · reabrir</button>
+                        ) : (
+                          <button onClick={() => onMarcarEntregue(item.id)} style={{ fontSize: 10, fontWeight: 700, color: '#16A34A', background: 'none', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 14, padding: '3px 10px', cursor: 'pointer' }}>Marcar Entregue</button>
+                        )}
+                        {onEditar && (
+                          <button onClick={() => abrirEdicao(item)} title="Editar" style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 4px', marginLeft: 'auto' }}>✎</button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

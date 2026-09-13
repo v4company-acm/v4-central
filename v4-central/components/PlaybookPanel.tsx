@@ -161,6 +161,14 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
     if (res.ok) await load()
   }
 
+  // Correção do que já foi lançado — o preenchimento é livre/personalizado, então
+  // accounts precisam poder ajustar título, tipo, data e responsável depois de criar.
+  async function editarItem(id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
+    if (res.ok) await load()
+    else { const d = await res.json().catch(() => ({})); alert(`Erro ao editar: ${d.error || 'tenta de novo.'}`) }
+  }
+
   function ItemRow({ item }: { item: any }) {
     const meta = TIPO_META[item.tipo as PlaybookTipo]
     const atrasado = isAtrasado(item)
@@ -218,43 +226,11 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         </div>
       )}
 
-      {regras.length === 0 && roadmaps.length === 0 && !loading && (
+      {regras.length === 0 && itens.length === 0 && !loading && (
         <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '14px 18px', marginBottom: 20, fontSize: 12, color: '#2563EB' }}>
-          Esse cliente ainda não tem playbook definido. Aplique um roteiro pronto abaixo (o mesmo cronograma que a V4 já usa) ou crie uma regra recorrente pra começar a gerar o calendário.
+          Esse cliente ainda não tem playbook definido. Monte abaixo, de forma personalizada, o que vai ser entregue nos próximos meses — dê um título, escolha a data e o responsável. Cada entrega fica editável depois de criada.
         </div>
       )}
-
-      {/* ── APLICAR ROTEIRO (TEMPLATE) ── */}
-      <div className="sec-title" style={{ fontSize: 16 }}>Aplicar Roteiro</div>
-      {roadmaps.length > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
-          Já aplicado: {roadmaps.map(r => `${r.template_nome} (${fmtDate(r.data_inicio)})`).join(' · ')}
-        </div>
-      )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, marginBottom: 24 }}>
-        {templates.map(t => {
-          const totalTarefas = t.fases.reduce((s: number, f: any) => s + f.tarefas.length, 0)
-          return (
-            <div key={t.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{t.horizonte_semanas} semanas</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>{t.nome}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>{t.fases.length} fases · {totalTarefas} tarefas</div>
-              {applyFormId === t.id ? (
-                <div>
-                  <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Início (semana 1)</label><input type="date" value={applyDataInicio} onChange={e => setApplyDataInicio(e.target.value)} /></div>
-                  <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-sm" onClick={() => setApplyFormId(null)} disabled={applying}>Cancelar</button>
-                    <button className="btn btn-sm btn-primary" onClick={aplicarTemplate} disabled={applying}>{applying ? 'Aplicando...' : 'Confirmar'}</button>
-                  </div>
-                </div>
-              ) : (
-                <button className="btn btn-sm btn-primary" onClick={() => abrirAplicar(t.id)}>Aplicar Roteiro</button>
-              )}
-            </div>
-          )
-        })}
-      </div>
 
       {/* ── SUGESTÕES RÁPIDAS ── */}
       <div className="sec-title" style={{ fontSize: 14 }}>Sugestões Rápidas</div>
@@ -376,8 +352,50 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
             itens={[...atrasados, ...noKanban]}
             onMarcarEntregue={marcarEntregue}
             onReabrir={reabrirItem}
+            onEditar={editarItem}
             janelaSemanas={JANELA_KANBAN_SEMANAS}
           />
+        </div>
+      )}
+
+      {/* ── APLICAR ROTEIRO (TEMPLATE) — opcional, ponto de partida só se ajudar; o que
+          importa é o playbook personalizado montado acima, e qualquer tarefa gerada aqui
+          pode ser editada normalmente no quadro. ── */}
+      {templates.length > 0 && (
+        <div style={{ marginTop: 8, marginBottom: 24 }}>
+          <div className="sec-title" style={{ fontSize: 13, color: 'var(--text-muted)' }}>Roteiros Prontos (opcional)</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+            Se ajudar como ponto de partida, você pode aplicar um roteiro-base da V4 pra gerar um esqueleto de tarefas — mas o playbook é pra ser personalizado por cliente, então depois de aplicado, edite/ajuste/remova o que quiser diretamente no quadro acima.
+          </div>
+          {roadmaps.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+              Já aplicado: {roadmaps.map(r => `${r.template_nome} (${fmtDate(r.data_inicio)})`).join(' · ')}
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+            {templates.map(t => {
+              const totalTarefas = t.fases.reduce((s: number, f: any) => s + f.tarefas.length, 0)
+              return (
+                <div key={t.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{t.horizonte_semanas} semanas</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>{t.nome}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>{t.fases.length} fases · {totalTarefas} tarefas</div>
+                  {applyFormId === t.id ? (
+                    <div>
+                      <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Início (semana 1)</label><input type="date" value={applyDataInicio} onChange={e => setApplyDataInicio(e.target.value)} /></div>
+                      <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-sm" onClick={() => setApplyFormId(null)} disabled={applying}>Cancelar</button>
+                        <button className="btn btn-sm btn-primary" onClick={aplicarTemplate} disabled={applying}>{applying ? 'Aplicando...' : 'Confirmar'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn btn-sm" onClick={() => abrirAplicar(t.id)}>Aplicar Roteiro</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

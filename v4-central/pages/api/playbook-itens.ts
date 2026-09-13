@@ -38,12 +38,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(201).json({ item })
   }
 
+  // PATCH cobre dois usos: mudar status (marcar entregue/reabrir) e editar os dados da
+  // entrega (título, tipo, data, responsável) — accounts precisam poder corrigir o que
+  // já lançaram, já que o preenchimento é livre/personalizado, não vem de um template fixo.
   if (req.method === 'PATCH') {
-    const { id, status, data_entrega, observacao } = req.body
-    if (!id || !status) return res.status(400).json({ error: 'Campos obrigatórios faltando' })
-    const patch: any = { status, observacao: observacao ?? null }
-    if (status === 'entregue') patch.data_entrega = data_entrega || new Date().toISOString().slice(0, 10)
-    if (status === 'pendente') patch.data_entrega = null
+    const { id, status, data_entrega, observacao, titulo, tipo, data_prevista, responsavel } = req.body
+    if (!id) return res.status(400).json({ error: 'id obrigatório' })
+    const patch: any = {}
+    if (status) {
+      patch.status = status
+      if (status === 'entregue') patch.data_entrega = data_entrega || new Date().toISOString().slice(0, 10)
+      if (status === 'pendente') patch.data_entrega = null
+    }
+    if (observacao !== undefined) patch.observacao = observacao || null
+    if (titulo !== undefined) patch.titulo = titulo
+    if (tipo !== undefined) patch.tipo = tipo
+    if (data_prevista !== undefined) patch.data_prevista = data_prevista
+    if (responsavel !== undefined) patch.responsavel = responsavel || null
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nada para atualizar' })
     const { data: item, error } = await supabase.from('playbook_itens').update(patch).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ item })

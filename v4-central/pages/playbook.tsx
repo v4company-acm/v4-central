@@ -4,7 +4,7 @@ import { getSession } from 'next-auth/react'
 import Head from 'next/head'
 import Layout from '../components/Layout'
 import PlaybookKanban from '../components/PlaybookKanban'
-import { fmtDate } from '../lib/playbook'
+import { fmtDate, PlaybookTipo } from '../lib/playbook'
 
 const C = {
   card: 'var(--card-color)', border: 'var(--border-color)', border2: 'var(--border-light)',
@@ -43,6 +43,11 @@ export default function PlaybookPage() {
   async function reabrirItem(id: number) {
     const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'pendente' }) })
     if (res.ok) load()
+  }
+  async function editarItem(id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
+    if (res.ok) load()
+    else { const d = await res.json().catch(() => ({})); alert(`Erro ao editar: ${d.error || 'tenta de novo.'}`) }
   }
   function abrirCliente(clienteId: string) {
     window.location.href = `/?cliente=${clienteId}&tab=playbook`
@@ -137,6 +142,7 @@ export default function PlaybookPage() {
                 itens={filteredItens}
                 onMarcarEntregue={marcarEntregue}
                 onReabrir={reabrirItem}
+                onEditar={editarItem}
                 mostrarCliente
                 onClickCliente={abrirCliente}
               />

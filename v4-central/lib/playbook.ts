@@ -124,3 +124,10 @@ export function todayISO() { return new Date().toISOString().slice(0, 10) }
 export function isAtrasado(item: { status: PlaybookStatus; data_prevista: string }) {
   return item.status === 'pendente' && item.data_prevista < todayISO()
 }
+/** Quantos dias uma entrega pendente já passou do prazo — usado pra sinalizar e cobrar. */
+export function diasAtraso(dataPrevista: string): number {
+  const [y, m, d] = dataPrevista.split('-').map(Number)
+  const prevista = new Date(y, m - 1, d)
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((hoje.getTime() - prevista.getTime()) / 86400000))
+}
