@@ -29,17 +29,24 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   const [autor, setAutor] = useState(autorPadrao || '')
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null)
   const [obsConfirm, setObsConfirm] = useState('')
+  const [templates, setTemplates] = useState<any[]>([])
+  const [roadmaps, setRoadmaps] = useState<any[]>([])
+  const [applyFormId, setApplyFormId] = useState<number | null>(null)
+  const [applyDataInicio, setApplyDataInicio] = useState(todayISO())
+  const [applying, setApplying] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       await fetch('/api/playbook-gerar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente_id: client.id }) })
-      const [rRes, iRes] = await Promise.all([
+      const [rRes, iRes, rmRes] = await Promise.all([
         fetch(`/api/playbook-regras?cliente_id=${client.id}`, { cache: 'no-store' }),
         fetch(`/api/playbook-itens?cliente_id=${client.id}`, { cache: 'no-store' }),
+        fetch(`/api/playbook-roadmaps?cliente_id=${client.id}`, { cache: 'no-store' }),
       ])
       if (rRes.ok) setRegras((await rRes.json()).regras || [])
       if (iRes.ok) setItens((await iRes.json()).itens || [])
+      if (rmRes.ok) setRoadmaps((await rmRes.json()).roadmaps || [])
     } catch (e) {
       console.error('Erro ao carregar Playbook:', e)
     } finally {
@@ -48,6 +55,9 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   }, [client.id])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    fetch('/api/playbook-templates', { cache: 'no-store' }).then(r => r.ok ? r.json() : { templates: [] }).then(d => setTemplates(d.templates || [])).catch(() => {})
+  }, [])
 
   const sugestoes = useMemo(() => sugerirPresets(client.servicos || []), [client.servicos])
   const titulosExistentes = useMemo(() => new Set(regras.filter(r => r.ativo).map(r => r.titulo)), [regras])
@@ -69,6 +79,34 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   function usarPreset(p: typeof PLAYBOOK_PRESETS[number]) {
     setRegraForm({ titulo: p.titulo, descricao: '', tipo: p.tipo, frequencia: p.frequencia, dia_semana: p.dia_semana ?? 1, dia_mes: p.dia_mes ?? 1, responsavel: '', data_inicio: todayISO() })
     setRegraFormOpen(true)
+  }
+
+  function abrirAplicar(templateId: number) {
+    setApplyDataInicio(client.dataEntrada || todayISO())
+    setApplyFormId(templateId)
+  }
+
+  async function aplicarTemplate() {
+    if (!autor.trim()) return alert('Informe quem está aplicando o roteiro.')
+    if (roadmaps.length > 0 && !confirm('Esse cliente já tem roteiro(s) aplicado(s) antes. Aplicar mais um vai somar as tarefas do novo template sem apagar o que já existe. Continuar?')) return
+    setApplying(true)
+    try {
+      const res = await fetch('/api/playbook-aplicar-template', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_id: client.id, template_id: applyFormId, data_inicio: applyDataInicio, criado_por: autor.trim() }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        await load()
+        setApplyFormId(null)
+        alert(`Roteiro aplicado — ${d.criados} tarefas geradas a partir de ${new Date(applyDataInicio + 'T00:00:00').toLocaleDateString('pt-BR')}.`)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        alert(`Erro ao aplicar: ${d.error || 'tenta de novo.'}`)
+      }
+    } finally {
+      setApplying(false)
+    }
   }
 
   async function salvarRegra() {
@@ -180,11 +218,43 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         </div>
       )}
 
-      {regras.length === 0 && !loading && (
+      {regras.length === 0 && roadmaps.length === 0 && !loading && (
         <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '14px 18px', marginBottom: 20, fontSize: 12, color: '#2563EB' }}>
-          Esse cliente ainda não tem playbook definido. Use as sugestões abaixo ou crie uma regra do zero pra começar a gerar o calendário dos próximos 3 meses.
+          Esse cliente ainda não tem playbook definido. Aplique um roteiro pronto abaixo (o mesmo cronograma que a V4 já usa) ou crie uma regra recorrente pra começar a gerar o calendário.
         </div>
       )}
+
+      {/* ── APLICAR ROTEIRO (TEMPLATE) ── */}
+      <div className="sec-title" style={{ fontSize: 16 }}>Aplicar Roteiro</div>
+      {roadmaps.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+          Já aplicado: {roadmaps.map(r => `${r.template_nome} (${fmtDate(r.data_inicio)})`).join(' · ')}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, marginBottom: 24 }}>
+        {templates.map(t => {
+          const totalTarefas = t.fases.reduce((s: number, f: any) => s + f.tarefas.length, 0)
+          return (
+            <div key={t.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{t.horizonte_semanas} semanas</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>{t.nome}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>{t.fases.length} fases · {totalTarefas} tarefas</div>
+              {applyFormId === t.id ? (
+                <div>
+                  <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Início (semana 1)</label><input type="date" value={applyDataInicio} onChange={e => setApplyDataInicio(e.target.value)} /></div>
+                  <div className="field" style={{ marginBottom: 8 }}><label style={{ fontSize: 10 }}>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-sm" onClick={() => setApplyFormId(null)} disabled={applying}>Cancelar</button>
+                    <button className="btn btn-sm btn-primary" onClick={aplicarTemplate} disabled={applying}>{applying ? 'Aplicando...' : 'Confirmar'}</button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn btn-sm btn-primary" onClick={() => abrirAplicar(t.id)}>Aplicar Roteiro</button>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {/* ── SUGESTÕES RÁPIDAS ── */}
       <div className="sec-title" style={{ fontSize: 14 }}>Sugestões Rápidas</div>

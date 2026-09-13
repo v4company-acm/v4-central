@@ -83,6 +83,7 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, mos
                           {item.cliente_nome || 'Cliente'}
                         </div>
                       )}
+                      {item.fase && <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 2 }}>{item.fase}</div>}
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-main)', textDecoration: entregue ? 'line-through' : 'none', marginBottom: item.responsavel ? 4 : 0 }}>{item.titulo}</div>
                       {item.responsavel && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{item.responsavel}</div>}
                       {entregue ? (
