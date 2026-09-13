@@ -3,6 +3,7 @@ import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
 import Head from 'next/head'
 import Layout from '../components/Layout'
+import PlaybookKanban from '../components/PlaybookKanban'
 import { fmtDate } from '../lib/playbook'
 
 const C = {
@@ -14,18 +15,37 @@ const C = {
 export default function PlaybookPage() {
   const [clients, setClients] = useState<any[]>([])
   const [porCliente, setPorCliente] = useState<Record<string, any>>({})
+  const [itensTodos, setItensTodos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<'todos' | 'sem_playbook' | 'atrasados'>('todos')
+  const [view, setView] = useState<'quadro' | 'cobertura'>('quadro')
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const [cRes, pRes] = await Promise.all([fetch('/api/clients', { cache: 'no-store' }), fetch('/api/playbook-summary', { cache: 'no-store' })])
+    const [cRes, pRes, iRes] = await Promise.all([
+      fetch('/api/clients', { cache: 'no-store' }),
+      fetch('/api/playbook-summary', { cache: 'no-store' }),
+      fetch('/api/playbook-itens-todos', { cache: 'no-store' }),
+    ])
     setClients(cRes.ok ? await cRes.json() : [])
     if (pRes.ok) setPorCliente((await pRes.json()).porCliente || {})
+    if (iRes.ok) setItensTodos((await iRes.json()).itens || [])
     setLoading(false)
+  }
+
+  async function marcarEntregue(id: number) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'entregue' }) })
+    if (res.ok) load()
+  }
+  async function reabrirItem(id: number) {
+    const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'pendente' }) })
+    if (res.ok) load()
+  }
+  function abrirCliente(clienteId: string) {
+    window.location.href = `/?cliente=${clienteId}&tab=playbook`
   }
 
   const rows = useMemo(() => {
@@ -36,17 +56,22 @@ export default function PlaybookPage() {
     })
   }, [clients, porCliente])
 
-  const filtered = rows.filter(r => {
+  const filteredRows = rows.filter(r => {
     const q = search.toLowerCase()
     const mq = !q || r.cliente.nome.toLowerCase().includes(q)
     const mf = filtro === 'todos' || (filtro === 'sem_playbook' && r.semPlaybook) || (filtro === 'atrasados' && r.p.atrasados > 0)
     return mq && mf
   }).sort((a, b) => {
-    // Prioriza quem precisa de ação: sem playbook primeiro, depois mais atrasados, depois próxima entrega mais próxima.
     if (a.semPlaybook !== b.semPlaybook) return a.semPlaybook ? -1 : 1
     if (a.p.atrasados !== b.p.atrasados) return b.p.atrasados - a.p.atrasados
     return (a.p.proxima || '9999-99-99').localeCompare(b.p.proxima || '9999-99-99')
   })
+
+  const filteredItens = useMemo(() => {
+    const q = search.toLowerCase()
+    if (!q) return itensTodos
+    return itensTodos.filter(i => (i.cliente_nome || '').toLowerCase().includes(q))
+  }, [itensTodos, search])
 
   const totalSemPlaybook = rows.filter(r => r.semPlaybook).length
   const totalAtrasados = rows.reduce((s, r) => s + (r.p.atrasados || 0), 0)
@@ -57,11 +82,11 @@ export default function PlaybookPage() {
     <>
       <Head><title>Playbook — V4 Central</title></Head>
       <Layout title="Playbook — Visão Unificada">
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{ maxWidth: 1500, margin: '0 auto' }}>
 
           <div style={{ fontSize: 13, color: C.text2, marginBottom: 20, maxWidth: 780, lineHeight: 1.6 }}>
-            Calendário de compromissos de todos os clientes num lugar só — pra cobrar prazo com antecedência real,
-            em vez de descobrir o atraso depois que já aconteceu. Clientes sem playbook definido aparecem primeiro.
+            Previsibilidade de tudo que será entregue no próximo mês, em todos os clientes — o quadro abaixo é
+            organizado por semana, não por status: dá pra ver de relance o que vence quando, sem abrir cliente por cliente.
           </div>
 
           {/* ── KPI STRIP ── */}
@@ -79,22 +104,44 @@ export default function PlaybookPage() {
             ))}
           </div>
 
-          {/* ── FILTROS ── */}
+          {/* ── FILTROS + TOGGLE DE VISÃO ── */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <input style={{ flex: 1, minWidth: 200, height: 38, background: 'var(--hover-bg)', border: 'none', borderRadius: 8, padding: '0 15px', fontSize: 13, outline: 'none', color: C.text }}
               placeholder="Pesquisar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
-            <select style={{ height: 38, background: 'var(--hover-bg)', border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 13, outline: 'none', cursor: 'pointer', color: C.text }}
-              value={filtro} onChange={e => setFiltro(e.target.value as any)}>
-              <option value="todos">Todos os clientes</option>
-              <option value="sem_playbook">Sem playbook definido</option>
-              <option value="atrasados">Com entregas atrasadas</option>
-            </select>
+            {view === 'cobertura' && (
+              <select style={{ height: 38, background: 'var(--hover-bg)', border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 13, outline: 'none', cursor: 'pointer', color: C.text }}
+                value={filtro} onChange={e => setFiltro(e.target.value as any)}>
+                <option value="todos">Todos os clientes</option>
+                <option value="sem_playbook">Sem playbook definido</option>
+                <option value="atrasados">Com entregas atrasadas</option>
+              </select>
+            )}
+            <div style={{ display: 'flex', gap: 4, background: 'var(--hover-bg)', borderRadius: 10, padding: 4 }}>
+              {[{ k: 'quadro', l: 'Quadro' }, { k: 'cobertura', l: 'Cobertura' }].map(o => (
+                <button key={o.k} onClick={() => setView(o.k as any)} style={{
+                  padding: '7px 16px', borderRadius: 7, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+                  background: view === o.k ? 'var(--card-color)' : 'transparent', color: view === o.k ? 'var(--text-main)' : 'var(--text-muted)',
+                  boxShadow: view === o.k ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                }}>{o.l}</button>
+              ))}
+            </div>
           </div>
 
-          {/* ── TABELA ── */}
           {loading ? (
             <div className="empty">Carregando...</div>
-          ) : filtered.length === 0 ? (
+          ) : view === 'quadro' ? (
+            filteredItens.length === 0 ? (
+              <div className="empty">Nenhuma entrega pendente pro próximo mês.</div>
+            ) : (
+              <PlaybookKanban
+                itens={filteredItens}
+                onMarcarEntregue={marcarEntregue}
+                onReabrir={reabrirItem}
+                mostrarCliente
+                onClickCliente={abrirCliente}
+              />
+            )
+          ) : filteredRows.length === 0 ? (
             <div className="empty">Nenhum cliente encontrado.</div>
           ) : (
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -108,9 +155,9 @@ export default function PlaybookPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(r => (
+                    {filteredRows.map(r => (
                       <tr key={r.cliente.id}
-                        onClick={() => window.location.href = `/?cliente=${r.cliente.id}&tab=playbook`}
+                        onClick={() => abrirCliente(r.cliente.id)}
                         style={{ borderBottom: `1px solid ${C.border2}`, cursor: 'pointer', transition: 'background .12s' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-bg)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

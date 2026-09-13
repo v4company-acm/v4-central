@@ -3,6 +3,9 @@ import {
   PlaybookTipo, TIPOS_ORDENADOS, TIPO_META, FREQ_LABEL, DIAS_SEMANA,
   PLAYBOOK_PRESETS, sugerirPresets, fmtCadencia, fmtDate, todayISO, isAtrasado,
 } from '../lib/playbook'
+import PlaybookKanban, { semanaDoItem } from './PlaybookKanban'
+
+const JANELA_KANBAN_SEMANAS = 4
 
 interface Props { client: any; autorPadrao?: string }
 
@@ -53,8 +56,14 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   const atrasados = pendentes.filter(isAtrasado)
   const proximosMeses = pendentes.filter(i => !isAtrasado(i))
 
+  // Curto prazo (próximas ~4 semanas) vira quadro kanban — dá a previsibilidade de
+  // relance que uma lista de texto não dá. O que passa disso (meses 2-3) fica na
+  // lista mensal mais enxuta abaixo, já que é horizonte de planejamento, não ação imediata.
+  const noKanban = proximosMeses.filter(i => semanaDoItem(i.data_prevista) < JANELA_KANBAN_SEMANAS)
+  const maisAdiante = proximosMeses.filter(i => semanaDoItem(i.data_prevista) >= JANELA_KANBAN_SEMANAS)
+
   const porMes: Record<string, any[]> = {}
-  proximosMeses.forEach(i => { const k = i.data_prevista.slice(0, 7); (porMes[k] = porMes[k] || []).push(i) })
+  maisAdiante.forEach(i => { const k = i.data_prevista.slice(0, 7); (porMes[k] = porMes[k] || []).push(i) })
   const meses = Object.keys(porMes).sort()
 
   function usarPreset(p: typeof PLAYBOOK_PRESETS[number]) {
@@ -167,7 +176,7 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
 
       {atrasados.length > 0 && (
         <div style={{ background: 'rgba(251,46,10,0.08)', border: '1px solid rgba(251,46,10,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 12, color: '#FB2E0A', fontWeight: 600 }}>
-          ⚠ {atrasados.length} entrega(s) atrasada(s) — role até "Linha do Tempo" pra confirmar ou reagendar.
+          ⚠ {atrasados.length} entrega(s) atrasada(s) — veja a coluna "Atrasado" no quadro abaixo.
         </div>
       )}
 
@@ -265,7 +274,7 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
 
       {/* ── LINHA DO TEMPO ── */}
       <div className="sec-title" style={{ fontSize: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Linha do Tempo — Próximos 3 Meses</span>
+        <span>Quadro — Próximo Mês</span>
         {!avulsoFormOpen && <button className="btn btn-sm" onClick={() => { setAvulsoForm(NOVO_AVULSO_DEFAULT); setAvulsoFormOpen(true) }}>+ Compromisso Avulso</button>}
       </div>
 
@@ -289,26 +298,31 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         </div>
       )}
 
-      {atrasados.length > 0 && (
-        <>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#FB2E0A', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Atrasadas</div>
-          <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
-            {atrasados.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
-          </div>
-        </>
+      {loading ? <div className="empty">Carregando...</div> : (atrasados.length === 0 && noKanban.length === 0) ? (
+        <div className="empty" style={{ marginBottom: 20 }}>Nenhuma entrega prevista pro próximo mês. Adicione uma regra recorrente ou um compromisso avulso.</div>
+      ) : (
+        <div style={{ marginBottom: 24 }}>
+          <PlaybookKanban
+            itens={[...atrasados, ...noKanban]}
+            onMarcarEntregue={marcarEntregue}
+            onReabrir={reabrirItem}
+            janelaSemanas={JANELA_KANBAN_SEMANAS}
+          />
+        </div>
       )}
 
-      {loading ? <div className="empty">Carregando...</div> : meses.length === 0 && atrasados.length === 0 ? (
-        <div className="empty">Nenhuma entrega prevista. Adicione uma regra recorrente ou um compromisso avulso.</div>
-      ) : (
-        meses.map(mes => (
-          <div key={mes} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{MesLabel(mes + '-01')}</div>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {porMes[mes].sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
+      {meses.length > 0 && (
+        <>
+          <div className="sec-title" style={{ fontSize: 14 }}>Mais Adiante (meses seguintes)</div>
+          {meses.map(mes => (
+            <div key={mes} style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{MesLabel(mes + '-01')}</div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {porMes[mes].sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
+              </div>
             </div>
-          </div>
-        ))
+          ))}
+        </>
       )}
     </div>
   )
