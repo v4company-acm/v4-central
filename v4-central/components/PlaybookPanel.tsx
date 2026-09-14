@@ -4,6 +4,7 @@ import {
   PLAYBOOK_PRESETS, sugerirPresets, fmtCadencia, fmtDate, todayISO, isAtrasado,
 } from '../lib/playbook'
 import PlaybookKanban, { semanaDoItem, normalizarLink, PlaybookItemEdit } from './PlaybookKanban'
+import PlaybookCalendario from './PlaybookCalendario'
 
 const JANELA_KANBAN_SEMANAS = 4
 
@@ -75,6 +76,14 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   const porMes: Record<string, any[]> = {}
   maisAdiante.forEach(i => { const k = i.data_prevista.slice(0, 7); (porMes[k] = porMes[k] || []).push(i) })
   const meses = Object.keys(porMes).sort()
+
+  // Histórico — registro permanente do que já foi entregue. Sem isso, marcar como
+  // entregue fazia o item simplesmente sumir de todas as telas (fica só pendente em outra
+  // aba do navegador/memória de quem viu). Agrupado por mês da entrega, mais recente primeiro.
+  const entregues = itens.filter(i => i.status === 'entregue')
+  const porMesEntrega: Record<string, any[]> = {}
+  entregues.forEach(i => { const k = (i.data_entrega || i.data_prevista).slice(0, 7); (porMesEntrega[k] = porMesEntrega[k] || []).push(i) })
+  const mesesEntrega = Object.keys(porMesEntrega).sort().reverse()
 
   function usarPreset(p: typeof PLAYBOOK_PRESETS[number]) {
     setRegraForm({ titulo: p.titulo, descricao: '', tipo: p.tipo, frequencia: p.frequencia, dia_semana: p.dia_semana ?? 1, dia_mes: p.dia_mes ?? 1, responsavel: '', data_inicio: todayISO() })
@@ -192,6 +201,9 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         {item.status === 'entregue' ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#16A34A' }}>Entregue {item.data_entrega ? `em ${fmtDate(item.data_entrega)}` : ''}</span>
+            {item.data_entrega && item.data_entrega > item.data_prevista && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#FB2E0A' }}>com atraso</span>
+            )}
             <button className="btn btn-sm" onClick={() => reabrirItem(item.id)}>Reabrir</button>
           </div>
         ) : confirmandoId === item.id ? (
@@ -237,6 +249,10 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '14px 18px', marginBottom: 20, fontSize: 12, color: '#2563EB' }}>
           Esse cliente ainda não tem playbook definido. Monte abaixo, de forma personalizada, o que vai ser entregue nos próximos meses — dê um título, escolha a data e o responsável. Cada entrega fica editável depois de criada.
         </div>
+      )}
+
+      {!loading && itens.length > 0 && (
+        <PlaybookCalendario itens={itens} onMarcarEntregue={marcarEntregue} onReabrir={reabrirItem} />
       )}
 
       {/* ── SUGESTÕES RÁPIDAS ── */}
@@ -420,6 +436,24 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{MesLabel(mes + '-01')}</div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {porMes[mes].sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)).map(i => <ItemRow key={i.id} item={i} />)}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* ── HISTÓRICO DE ENTREGAS ── registro permanente, não some depois de confirmado. */}
+      {mesesEntrega.length > 0 && (
+        <>
+          <div className="sec-title" style={{ fontSize: 14 }}>Histórico de Entregas</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+            Tudo que já foi marcado como entregue fica registrado aqui, com a data real da entrega — dá pra conferir depois o que foi feito e quando.
+          </div>
+          {mesesEntrega.map(mes => (
+            <div key={mes} style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{MesLabel(mes + '-01')}</div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {porMesEntrega[mes].sort((a, b) => (b.data_entrega || '').localeCompare(a.data_entrega || '')).map(i => <ItemRow key={i.id} item={i} />)}
               </div>
             </div>
           ))}
