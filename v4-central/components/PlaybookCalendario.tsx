@@ -1,185 +1,169 @@
 import { useMemo, useState, CSSProperties } from 'react'
-import { PlaybookTipo, TIPOS_ORDENADOS, TIPO_META, fmtDate, isAtrasado } from '../lib/playbook'
-import { semanaDoItem, normalizarLink } from './PlaybookKanban'
+import { PlaybookTipo, TIPO_META, fmtDate, isAtrasado, todayISO } from '../lib/playbook'
+import { normalizarLink } from './PlaybookKanban'
 
-// Visão "de cima" inspirada no calendário por semana/mês que a V4 já usa em planilha —
-// só que com os dados reais (não célula pintada à mão), e sem sumir quando algo é
-// entregue: o grid inclui pendente E entregue dentro do horizonte, então funciona
-// também como um raio-x rápido do que já foi feito. Linhas por tipo de entrega
-// (reaproveita a mesma taxonomia usada no resto do Playbook), colunas por semana.
+// Calendário de verdade (mês por mês, dia a dia) — não um heatmap abstrato. A ideia
+// é que dê pra entender o que tem em cada dia só de bater o olho, do jeito que
+// qualquer agenda (Google Calendar etc.) já mostra: dia com os títulos das entregas
+// daquele dia, coloridos por tipo, "+N mais" quando não cabe tudo. Clica no dia pra
+// ver a lista completa com ação (marcar entregue, abrir link do material).
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const MAX_CHIPS_VISIVEIS = 3
 
-function segundaAtual() {
-  const d = new Date()
-  const dia = d.getDay()
-  const offset = dia === 0 ? -6 : 1 - dia
-  d.setDate(d.getDate() + offset)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
+function pad2(n: number) { return String(n).padStart(2, '0') }
+function toISO(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r }
-
-const COL_TIPO_W = 132
-const COL_ATRASADO_W = 78
-const COL_SEMANA_W = 46
-
-const thBase: CSSProperties = { padding: '7px 4px', textAlign: 'center', fontSize: 10, borderBottom: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }
-const tdBase: CSSProperties = { padding: '6px 4px', textAlign: 'center', borderBottom: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }
 
 interface Props {
   itens: any[]
-  horizonSemanas?: number
   onMarcarEntregue: (id: number) => void
   onReabrir: (id: number) => void
   mostrarCliente?: boolean
   onClickCliente?: (clienteId: string) => void
 }
 
-export default function PlaybookCalendario({ itens, horizonSemanas = 13, onMarcarEntregue, onReabrir, mostrarCliente, onClickCliente }: Props) {
-  const semanas = useMemo(() => {
-    const seg0 = segundaAtual()
-    return Array.from({ length: horizonSemanas }, (_, i) => {
-      const seg = addDays(seg0, i * 7)
-      return { offset: i, mes: MESES[seg.getMonth()], ano: seg.getFullYear() }
-    })
-  }, [horizonSemanas])
+export default function PlaybookCalendario({ itens, onMarcarEntregue, onReabrir, mostrarCliente, onClickCliente }: Props) {
+  const hojeISO = useMemo(() => todayISO(), [])
+  const [cursor, setCursor] = useState(() => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1) })
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null)
 
-  const gruposMes = useMemo(() => {
-    const grupos: { mes: string; ano: number; count: number }[] = []
-    semanas.forEach(s => {
-      const ultimo = grupos[grupos.length - 1]
-      if (ultimo && ultimo.mes === s.mes && ultimo.ano === s.ano) ultimo.count++
-      else grupos.push({ mes: s.mes, ano: s.ano, count: 1 })
-    })
-    return grupos
-  }, [semanas])
-
-  const tiposPresentes = useMemo(() => {
-    const vistos = new Set<string>()
-    itens.forEach(i => {
-      const atrasado = i.status === 'pendente' && isAtrasado(i)
-      const off = semanaDoItem(i.data_prevista)
-      if (atrasado || (off >= 0 && off < horizonSemanas)) vistos.add(i.tipo)
-    })
-    return TIPOS_ORDENADOS.filter(t => vistos.has(t))
-  }, [itens, horizonSemanas])
-
-  // matriz[tipo]['atrasado' | offsetString] = itens[]
-  const matriz = useMemo(() => {
-    const m: Record<string, Record<string, any[]>> = {}
-    tiposPresentes.forEach(t => (m[t] = {}))
-    itens.forEach(item => {
-      if (!tiposPresentes.includes(item.tipo)) return
-      if (item.status === 'pendente' && isAtrasado(item)) {
-        (m[item.tipo]['atrasado'] = m[item.tipo]['atrasado'] || []).push(item)
-        return
-      }
-      const off = semanaDoItem(item.data_prevista)
-      if (off >= 0 && off < horizonSemanas) {
-        const key = String(off)
-        ;(m[item.tipo][key] = m[item.tipo][key] || []).push(item)
-      }
-    })
+  const porDia = useMemo(() => {
+    const m: Record<string, any[]> = {}
+    itens.forEach(item => { (m[item.data_prevista] = m[item.data_prevista] || []).push(item) })
+    Object.values(m).forEach(lista => lista.sort((a, b) => a.status === b.status ? 0 : a.status === 'entregue' ? 1 : -1))
     return m
-  }, [itens, tiposPresentes, horizonSemanas])
+  }, [itens])
 
-  const [selecionado, setSelecionado] = useState<{ tipo: string; key: string } | null>(null)
+  const celulas = useMemo(() => {
+    const primeiroDiaSemana = cursor.getDay()
+    const diasNoMes = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate()
+    const totalCelulas = Math.ceil((primeiroDiaSemana + diasNoMes) / 7) * 7
+    const inicioGrid = addDays(cursor, -primeiroDiaSemana)
+    return Array.from({ length: totalCelulas }, (_, i) => {
+      const d = addDays(inicioGrid, i)
+      return { iso: toISO(d), dia: d.getDate(), noMesAtual: d.getMonth() === cursor.getMonth() }
+    })
+  }, [cursor])
 
-  function toggleCell(tipo: string, key: string) {
-    setSelecionado(prev => (prev && prev.tipo === tipo && prev.key === key) ? null : { tipo, key })
-  }
+  function mesAnterior() { setCursor(c => new Date(c.getFullYear(), c.getMonth() - 1, 1)); setDiaSelecionado(null) }
+  function proximoMes() { setCursor(c => new Date(c.getFullYear(), c.getMonth() + 1, 1)); setDiaSelecionado(null) }
+  function irHoje() { const h = new Date(); setCursor(new Date(h.getFullYear(), h.getMonth(), 1)); setDiaSelecionado(hojeISO) }
 
-  if (tiposPresentes.length === 0) return null
-
-  const itensSelecionados = selecionado ? (matriz[selecionado.tipo]?.[selecionado.key] || []) : []
-  const mesesAprox = Math.max(1, Math.round(horizonSemanas / 4.33))
+  const itensSelecionados = diaSelecionado ? (porDia[diaSelecionado] || []) : []
+  const cursorEhMesAtual = cursor.getFullYear() === new Date().getFullYear() && cursor.getMonth() === new Date().getMonth()
 
   return (
     <div style={{ marginBottom: 28 }}>
-      <div className="sec-title" style={{ fontSize: 16 }}>Visão Geral — Próximos {mesesAprox} Meses</div>
+      <div className="sec-title" style={{ fontSize: 16 }}>Calendário de Entregas</div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
-        Tudo que está previsto ou já foi entregue nesse período, por tipo de entrega e semana. Clique numa célula pra ver o detalhe.
+        O que está previsto ou já foi entregue, dia a dia. Clique num dia pra ver o detalhe completo.
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={mesAnterior} style={navBtnStyle} aria-label="Mês anterior">‹</button>
+          <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-main)', minWidth: 150, textAlign: 'center' }}>
+            {MESES[cursor.getMonth()]} {cursor.getFullYear()}
+          </span>
+          <button onClick={proximoMes} style={navBtnStyle} aria-label="Próximo mês">›</button>
+        </div>
+        {!cursorEhMesAtual && (
+          <button onClick={irHoje} style={{ ...navBtnStyle, width: 'auto', padding: '0 14px', fontSize: 11, fontWeight: 700 }}>Hoje</button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }}>
-        {tiposPresentes.map(t => (
+        {tiposComItens(itens).map(t => (
           <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: TIPO_META[t as PlaybookTipo].color, display: 'inline-block' }} />
-            {TIPO_META[t as PlaybookTipo].label}
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: TIPO_META[t].color, display: 'inline-block' }} />
+            {TIPO_META[t].label}
           </div>
         ))}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: '#FB2E0A', fontWeight: 700 }}>
           <span style={{ width: 9, height: 9, borderRadius: 3, background: '#FB2E0A', display: 'inline-block' }} /> Atrasado
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: '#16A34A', fontWeight: 700 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 3, background: '#16A34A', display: 'inline-block' }} /> Entregue
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, textDecoration: 'line-through' }}>
+          ✓ Entregue
         </div>
       </div>
 
       <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
-            <thead>
-              <tr>
-                <th rowSpan={2} style={{ ...thBase, position: 'sticky', left: 0, zIndex: 3, width: COL_TIPO_W, minWidth: COL_TIPO_W, background: 'var(--card-color)' }} />
-                <th rowSpan={2} style={{ ...thBase, position: 'sticky', left: COL_TIPO_W, zIndex: 3, width: COL_ATRASADO_W, minWidth: COL_ATRASADO_W, background: 'var(--card-color)', color: '#FB2E0A', fontWeight: 800 }}>Atrasado</th>
-                {gruposMes.map((g, i) => (
-                  <th key={i} colSpan={g.count} style={{ ...thBase, background: i % 2 === 0 ? 'var(--hover-bg)' : 'var(--card-color)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                    {g.mes}{g.ano !== new Date().getFullYear() ? ` ’${String(g.ano).slice(2)}` : ''}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {semanas.map((s, i) => (
-                  <th key={i} style={{ ...thBase, width: COL_SEMANA_W, minWidth: COL_SEMANA_W, fontWeight: 600, color: 'var(--text-muted)' }}>S{i + 1}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tiposPresentes.map(tipo => {
-                const meta = TIPO_META[tipo as PlaybookTipo]
-                return (
-                  <tr key={tipo}>
-                    <td style={{ ...tdBase, position: 'sticky', left: 0, zIndex: 2, background: 'var(--card-color)', textAlign: 'left', paddingLeft: 10 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: meta.bg, color: meta.color, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{meta.label}</span>
-                    </td>
-                    <CelulaCalendario itens={matriz[tipo]['atrasado']} atrasado sticky={COL_TIPO_W} selecionado={selecionado?.tipo === tipo && selecionado.key === 'atrasado'} onClick={() => toggleCell(tipo, 'atrasado')} />
-                    {semanas.map(s => {
-                      const key = String(s.offset)
-                      return (
-                        <CelulaCalendario key={key} itens={matriz[tipo][key]} meta={meta} selecionado={selecionado?.tipo === tipo && selecionado.key === key} onClick={() => toggleCell(tipo, key)} />
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', background: 'var(--hover-bg)' }}>
+          {DIAS_SEMANA.map(d => (
+            <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border-color)' }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+          {celulas.map((cel, i) => {
+            const itensDoDia: any[] = porDia[cel.iso] || []
+            const ehHoje = cel.iso === hojeISO
+            const selecionado = cel.iso === diaSelecionado
+            const visiveis = itensDoDia.slice(0, MAX_CHIPS_VISIVEIS)
+            const resto = itensDoDia.length - visiveis.length
+            return (
+              <div key={i}
+                onClick={() => itensDoDia.length > 0 && setDiaSelecionado(prev => prev === cel.iso ? null : cel.iso)}
+                style={{
+                  minHeight: 92, padding: '6px 5px', borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border-color)' : 'none',
+                  borderBottom: '1px solid var(--border-color)', background: selecionado ? 'var(--hover-bg)' : 'var(--card-color)',
+                  opacity: cel.noMesAtual ? 1 : 0.4, cursor: itensDoDia.length > 0 ? 'pointer' : 'default',
+                  boxShadow: selecionado ? 'inset 0 0 0 2px #2563EB' : 'none',
+                }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: ehHoje ? '#fff' : 'var(--text-secondary)', marginBottom: 5,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: '50%',
+                  background: ehHoje ? '#2563EB' : 'transparent',
+                }}>{cel.dia}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {visiveis.map(item => {
+                    const meta = TIPO_META[item.tipo as PlaybookTipo]
+                    const entregue = item.status === 'entregue'
+                    const atrasado = !entregue && isAtrasado(item)
+                    return (
+                      <div key={item.id} title={item.titulo} style={{
+                        fontSize: 10, fontWeight: 600, padding: '2px 5px', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        color: entregue ? 'var(--text-muted)' : atrasado ? '#FB2E0A' : meta.color,
+                        background: entregue ? 'var(--hover-bg)' : atrasado ? 'rgba(251,46,10,0.12)' : meta.bg,
+                        textDecoration: entregue ? 'line-through' : 'none',
+                      }}>
+                        {entregue ? '✓ ' : ''}{item.titulo}
+                      </div>
+                    )
+                  })}
+                  {resto > 0 && <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-muted)', padding: '0 5px' }}>+{resto} mais</div>}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {selecionado && itensSelecionados.length > 0 && (
+      {diaSelecionado && itensSelecionados.length > 0 && (
         <div style={{ marginTop: 12, background: 'var(--hover-bg)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
-              {TIPO_META[selecionado.tipo as PlaybookTipo].label} · {selecionado.key === 'atrasado' ? 'Atrasado' : `Semana ${parseInt(selecionado.key, 10) + 1}`}
+              {fmtDate(diaSelecionado)}{diaSelecionado === hojeISO ? ' · Hoje' : ''}
             </span>
-            <button onClick={() => setSelecionado(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+            <button onClick={() => setDiaSelecionado(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>✕</button>
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {itensSelecionados.map((item: any) => {
+              const meta = TIPO_META[item.tipo as PlaybookTipo]
               const entregue = item.status === 'entregue'
+              const atrasado = !entregue && isAtrasado(item)
               return (
                 <div key={item.id} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ width: 74, flexShrink: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>{fmtDate(item.data_prevista)}</div>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: meta.bg, color: meta.color, textTransform: 'uppercase', flexShrink: 0 }}>{meta.label}</span>
                   <div style={{ flex: 1, minWidth: 160 }}>
                     {mostrarCliente && (
                       <div onClick={() => onClickCliente?.(item.cliente_id)} style={{ fontSize: 10, fontWeight: 700, color: '#2563EB', cursor: onClickCliente ? 'pointer' : 'default' }}>{item.cliente_nome || 'Cliente'}</div>
                     )}
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)', textDecoration: entregue ? 'line-through' : 'none' }}>{item.titulo}</div>
                     {item.responsavel && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.responsavel}</div>}
-                    {item.link && <a href={normalizarLink(item.link)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: '#2563EB' }}>🔗 Ver material</a>}
+                    {atrasado && <div style={{ fontSize: 10, fontWeight: 800, color: '#FB2E0A' }}>Atrasado</div>}
+                    {item.link && <a href={normalizarLink(item.link)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, fontWeight: 700, color: '#2563EB', display: 'inline-block', marginTop: 2 }}>🔗 Ver material</a>}
                   </div>
                   {entregue ? (
                     <button onClick={() => onReabrir(item.id)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>✓ Entregue · reabrir</button>
@@ -196,29 +180,13 @@ export default function PlaybookCalendario({ itens, horizonSemanas = 13, onMarca
   )
 }
 
-function CelulaCalendario({ itens, meta, atrasado, sticky, selecionado, onClick }: {
-  itens?: any[]; meta?: { color: string; bg: string }; atrasado?: boolean; sticky?: number; selecionado?: boolean; onClick: () => void
-}) {
-  const count = itens?.length || 0
-  const vazio = count === 0
-  const todosEntregues = !vazio && itens!.every(i => i.status === 'entregue')
-  const cor = atrasado ? '#FB2E0A' : todosEntregues ? '#16A34A' : meta?.color || 'var(--text-muted)'
-  const bg = vazio ? 'transparent' : atrasado ? 'rgba(251,46,10,0.12)' : todosEntregues ? 'rgba(22,163,74,0.12)' : (meta?.bg || 'var(--hover-bg)')
+function tiposComItens(itens: any[]): PlaybookTipo[] {
+  const vistos = new Set<string>()
+  itens.forEach(i => vistos.add(i.tipo))
+  return (Object.keys(TIPO_META) as PlaybookTipo[]).filter(t => vistos.has(t))
+}
 
-  const style: CSSProperties = { ...tdBase, cursor: vazio ? 'default' : 'pointer', background: sticky != null && vazio ? 'var(--card-color)' : bg }
-  if (sticky != null) { style.position = 'sticky'; style.left = sticky; style.zIndex = 2 }
-
-  return (
-    <td onClick={vazio ? undefined : onClick} style={style}>
-      {!vazio && (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 6,
-          fontSize: 10, fontWeight: 800, color: cor, border: selecionado ? `1.5px solid ${cor}` : 'none',
-          boxShadow: selecionado ? `0 0 0 2px ${cor}33` : 'none',
-        }}>
-          {todosEntregues ? '✓' : count}
-        </span>
-      )}
-    </td>
-  )
+const navBtnStyle: CSSProperties = {
+  width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--card-color)',
+  color: 'var(--text-main)', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 }
