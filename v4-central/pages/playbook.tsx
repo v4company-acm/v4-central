@@ -3,8 +3,8 @@ import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
 import Head from 'next/head'
 import Layout from '../components/Layout'
-import PlaybookKanban from '../components/PlaybookKanban'
-import { fmtDate, PlaybookTipo } from '../lib/playbook'
+import PlaybookKanban, { PlaybookItemEdit } from '../components/PlaybookKanban'
+import { fmtDate } from '../lib/playbook'
 
 const C = {
   card: 'var(--card-color)', border: 'var(--border-color)', border2: 'var(--border-light)',
@@ -44,7 +44,7 @@ export default function PlaybookPage() {
     const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'pendente' }) })
     if (res.ok) load()
   }
-  async function editarItem(id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) {
+  async function editarItem(id: number, patch: PlaybookItemEdit) {
     const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
     if (res.ok) load()
     else { const d = await res.json().catch(() => ({})); alert(`Erro ao editar: ${d.error || 'tenta de novo.'}`) }

@@ -31,27 +31,51 @@ export function semanaDoItem(dataISO: string): number {
   return Math.round((segData.getTime() - segHoje.getTime()) / (7 * 86400000))
 }
 
+export interface PlaybookItemEdit {
+  titulo: string
+  tipo: PlaybookTipo
+  data_prevista: string
+  responsavel: string | null
+  descricao: string | null
+  link: string | null
+}
+
 interface Props {
   itens: any[]
   onMarcarEntregue: (id: number) => void
   onReabrir: (id: number) => void
-  onEditar?: (id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) => void
+  onEditar?: (id: number, patch: PlaybookItemEdit) => void
   mostrarCliente?: boolean
   onClickCliente?: (clienteId: string) => void
   janelaSemanas?: number // quantas colunas de semana mostrar além de "Atrasado" (default 4)
 }
 
+const EDIT_FORM_VAZIO = { titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: '', responsavel: '', descricao: '', link: '' }
+
+/** Garante que um link salvo sem protocolo (ex: "drive.google.com/...") ainda abra certo. */
+export function normalizarLink(url: string) {
+  if (!/^https?:\/\//i.test(url)) return `https://${url}`
+  return url
+}
+
 export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, onEditar, mostrarCliente, onClickCliente, janelaSemanas = 4 }: Props) {
   const [editandoId, setEditandoId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState({ titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: '', responsavel: '' })
+  const [editForm, setEditForm] = useState(EDIT_FORM_VAZIO)
 
   function abrirEdicao(item: any) {
-    setEditForm({ titulo: item.titulo, tipo: item.tipo, data_prevista: item.data_prevista, responsavel: item.responsavel || '' })
+    setEditForm({
+      titulo: item.titulo, tipo: item.tipo, data_prevista: item.data_prevista,
+      responsavel: item.responsavel || '', descricao: item.descricao || '', link: item.link || '',
+    })
     setEditandoId(item.id)
   }
   function salvarEdicao() {
     if (!editForm.titulo.trim() || editandoId == null) return
-    onEditar?.(editandoId, { titulo: editForm.titulo.trim(), tipo: editForm.tipo, data_prevista: editForm.data_prevista, responsavel: editForm.responsavel.trim() || null })
+    onEditar?.(editandoId, {
+      titulo: editForm.titulo.trim(), tipo: editForm.tipo, data_prevista: editForm.data_prevista,
+      responsavel: editForm.responsavel.trim() || null, descricao: editForm.descricao.trim() || null,
+      link: editForm.link.trim() ? normalizarLink(editForm.link.trim()) : null,
+    })
     setEditandoId(null)
   }
 
@@ -72,7 +96,7 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, onE
         const lista = porColuna[col.key] || []
         const atrasadoCol = col.key === 'atrasado'
         return (
-          <div key={col.key} style={{ minWidth: 240, maxWidth: 260, flexShrink: 0, background: 'var(--hover-bg)', borderRadius: 10, padding: 10 }}>
+          <div key={col.key} style={{ minWidth: 250, maxWidth: 270, flexShrink: 0, background: 'var(--hover-bg)', borderRadius: 10, padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px 10px', borderBottom: `2px solid ${atrasadoCol ? '#FB2E0A' : 'var(--border-color)'}`, marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: atrasadoCol ? '#FB2E0A' : 'var(--text-secondary)' }}>{col.label}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: atrasadoCol && lista.length > 0 ? '#fff' : 'var(--text-muted)', background: atrasadoCol && lista.length > 0 ? '#FB2E0A' : 'transparent', padding: atrasadoCol && lista.length > 0 ? '1px 7px' : 0, borderRadius: 10 }}>{lista.length}</span>
@@ -89,14 +113,18 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, onE
                   if (editandoId === item.id) {
                     return (
                       <div key={item.id} style={{ background: 'var(--card-color)', border: '1.5px solid var(--red)', borderRadius: 8, padding: '10px 12px' }}>
-                        <input value={editForm.titulo} onChange={e => setEditForm(p => ({ ...p, titulo: e.target.value }))} style={{ width: '100%', fontSize: 12, marginBottom: 6, height: 30 }} />
+                        <input value={editForm.titulo} onChange={e => setEditForm(p => ({ ...p, titulo: e.target.value }))} placeholder="Título" style={{ width: '100%', fontSize: 12, marginBottom: 6, height: 30 }} />
                         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                           <select value={editForm.tipo} onChange={e => setEditForm(p => ({ ...p, tipo: e.target.value as PlaybookTipo }))} style={{ flex: 1, fontSize: 11, height: 30 }}>
                             {TIPOS_ORDENADOS.map(t => <option key={t} value={t}>{TIPO_META[t].label}</option>)}
                           </select>
                           <input type="date" value={editForm.data_prevista} onChange={e => setEditForm(p => ({ ...p, data_prevista: e.target.value }))} style={{ flex: 1, fontSize: 11, height: 30 }} />
                         </div>
-                        <input value={editForm.responsavel} onChange={e => setEditForm(p => ({ ...p, responsavel: e.target.value }))} placeholder="Responsável" style={{ width: '100%', fontSize: 12, marginBottom: 8, height: 30 }} />
+                        <input value={editForm.responsavel} onChange={e => setEditForm(p => ({ ...p, responsavel: e.target.value }))} placeholder="Responsável" style={{ width: '100%', fontSize: 12, marginBottom: 6, height: 30 }} />
+                        <textarea value={editForm.descricao} onChange={e => setEditForm(p => ({ ...p, descricao: e.target.value }))} placeholder="Detalhes / observações (o que é, o que falta, combinados...)" rows={2}
+                          style={{ width: '100%', fontSize: 11, marginBottom: 6, padding: '6px 8px', resize: 'vertical', fontFamily: 'inherit', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--card-color)', color: 'var(--text-main)' }} />
+                        <input value={editForm.link} onChange={e => setEditForm(p => ({ ...p, link: e.target.value }))} placeholder="Link do material (Drive, Figma, LP, Ekyte...)"
+                          style={{ width: '100%', fontSize: 11, marginBottom: 8, height: 30 }} />
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => setEditandoId(null)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: '1px solid var(--border-color)', borderRadius: 14, padding: '4px 10px', cursor: 'pointer' }}>Cancelar</button>
                           <button onClick={salvarEdicao} style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'var(--red)', border: 'none', borderRadius: 14, padding: '4px 10px', cursor: 'pointer' }}>Salvar</button>
@@ -127,6 +155,17 @@ export default function PlaybookKanban({ itens, onMarcarEntregue, onReabrir, onE
                       {item.fase && <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 2 }}>{item.fase}</div>}
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-main)', textDecoration: entregue ? 'line-through' : 'none', marginBottom: item.responsavel ? 4 : 0 }}>{item.titulo}</div>
                       {item.responsavel && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{item.responsavel}</div>}
+                      {item.descricao && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: 6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {item.descricao}
+                        </div>
+                      )}
+                      {item.link && (
+                        <a href={normalizarLink(item.link)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 10, fontWeight: 700, color: '#2563EB', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 8, textDecoration: 'none' }}>
+                          🔗 Ver material
+                        </a>
+                      )}
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         {entregue ? (
                           <button onClick={() => onReabrir(item.id)} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✓ Entregue · reabrir</button>

@@ -3,14 +3,14 @@ import {
   PlaybookTipo, TIPOS_ORDENADOS, TIPO_META, FREQ_LABEL, DIAS_SEMANA,
   PLAYBOOK_PRESETS, sugerirPresets, fmtCadencia, fmtDate, todayISO, isAtrasado,
 } from '../lib/playbook'
-import PlaybookKanban, { semanaDoItem } from './PlaybookKanban'
+import PlaybookKanban, { semanaDoItem, normalizarLink, PlaybookItemEdit } from './PlaybookKanban'
 
 const JANELA_KANBAN_SEMANAS = 4
 
 interface Props { client: any; autorPadrao?: string }
 
 const NOVA_REGRA_DEFAULT = { titulo: '', descricao: '', tipo: 'relatorio' as PlaybookTipo, frequencia: 'semanal' as 'semanal' | 'quinzenal' | 'mensal' | 'unico', dia_semana: 1, dia_mes: 1, responsavel: '', data_inicio: todayISO() }
-const NOVO_AVULSO_DEFAULT = { titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: todayISO(), responsavel: '' }
+const NOVO_AVULSO_DEFAULT = { titulo: '', tipo: 'outro' as PlaybookTipo, data_prevista: todayISO(), responsavel: '', descricao: '', link: '' }
 
 function MesLabel(dataISO: string) {
   const [y, m] = dataISO.split('-')
@@ -139,7 +139,11 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   async function salvarAvulso() {
     if (!avulsoForm.titulo.trim()) return alert('Dê um título pro compromisso.')
     if (!autor.trim()) return alert('Informe quem está cadastrando.')
-    const body = { cliente_id: client.id, titulo: avulsoForm.titulo.trim(), tipo: avulsoForm.tipo, data_prevista: avulsoForm.data_prevista, responsavel: avulsoForm.responsavel.trim() || null, criado_por: autor.trim() }
+    const body = {
+      cliente_id: client.id, titulo: avulsoForm.titulo.trim(), tipo: avulsoForm.tipo, data_prevista: avulsoForm.data_prevista,
+      responsavel: avulsoForm.responsavel.trim() || null, criado_por: autor.trim(),
+      descricao: avulsoForm.descricao.trim() || null, link: avulsoForm.link.trim() || null,
+    }
     const res = await fetch('/api/playbook-itens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (res.ok) { await load(); setAvulsoFormOpen(false); setAvulsoForm(NOVO_AVULSO_DEFAULT) }
     else { const d = await res.json().catch(() => ({})); alert(`Erro ao salvar: ${d.error || 'tenta de novo.'}`) }
@@ -162,8 +166,9 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
   }
 
   // Correção do que já foi lançado — o preenchimento é livre/personalizado, então
-  // accounts precisam poder ajustar título, tipo, data e responsável depois de criar.
-  async function editarItem(id: number, patch: { titulo: string; tipo: PlaybookTipo; data_prevista: string; responsavel: string | null }) {
+  // accounts precisam poder ajustar título, tipo, data, responsável, descrição e link
+  // (onde está o material) depois de criar.
+  async function editarItem(id: number, patch: PlaybookItemEdit) {
     const res = await fetch('/api/playbook-itens', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...patch }) })
     if (res.ok) await load()
     else { const d = await res.json().catch(() => ({})); alert(`Erro ao editar: ${d.error || 'tenta de novo.'}`) }
@@ -180,7 +185,9 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
         <div style={{ flex: 1, minWidth: 140 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{item.titulo}</div>
           {item.responsavel && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.responsavel}</div>}
-          {item.observacao && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{item.observacao}</div>}
+          {item.descricao && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{item.descricao}</div>}
+          {item.observacao && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{item.observacao}</div>}
+          {item.link && <a href={normalizarLink(item.link)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', marginTop: 2, display: 'inline-block' }}>🔗 Ver material</a>}
         </div>
         {item.status === 'entregue' ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -336,6 +343,12 @@ export default function PlaybookPanel({ client, autorPadrao }: Props) {
             <div className="field"><label>Data</label><input type="date" value={avulsoForm.data_prevista} onChange={e => setAvulsoForm((p: any) => ({ ...p, data_prevista: e.target.value }))} /></div>
             <div className="field"><label>Responsável</label><input value={avulsoForm.responsavel} onChange={e => setAvulsoForm((p: any) => ({ ...p, responsavel: e.target.value }))} /></div>
           </div>
+          <div className="field">
+            <label>Detalhes / observações</label>
+            <textarea value={avulsoForm.descricao} onChange={e => setAvulsoForm((p: any) => ({ ...p, descricao: e.target.value }))} rows={2}
+              placeholder="O que é essa entrega, o que foi combinado, o que falta..." style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--card-color)', color: 'var(--text-main)', fontSize: 13 }} />
+          </div>
+          <div className="field"><label>Link do material</label><input value={avulsoForm.link} onChange={e => setAvulsoForm((p: any) => ({ ...p, link: e.target.value }))} placeholder="Drive, Figma, LP, Ekyte..." /></div>
           <div className="field"><label>Registrado por *</label><input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Seu nome" /></div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-sm" onClick={() => setAvulsoFormOpen(false)}>Cancelar</button>
