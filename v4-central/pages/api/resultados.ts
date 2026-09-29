@@ -2,73 +2,12 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { createClient } from '@supabase/supabase-js'
 import authOptions from '../../lib/authOptions'
-
-const WINDSOR_API_KEY = process.env.WINDSOR_API_KEY!
-const WINDSOR_BASE = 'https://connectors.windsor.ai'
+import { buildGoogle, buildMeta } from '../../lib/windsorAds'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-const onlyDigits = (s: string) => (s || '').replace(/\D/g, '')
-
-function filtrarPorConta(data: any[], accountId?: string | null) {
-  if (!accountId) return data
-  const alvo = onlyDigits(accountId)
-  return data.filter(r => onlyDigits(r.account_id) === alvo)
-}
-function filtrarCampanhas(data: any[], filtro?: string | null) {
-  if (!filtro) return data
-  const filtros = filtro.split(',').map(f => f.toLowerCase().trim())
-  return data.filter(r => filtros.some(f => (r.campaign_name || '').toLowerCase().includes(f)))
-}
-
-async function fetchWindsor(kind: 'google_ads' | 'facebook', fields: string[], dateFrom: string, dateTo: string) {
-  const url = `${WINDSOR_BASE}/${kind}?api_key=${WINDSOR_API_KEY}&date_from=${dateFrom}&date_to=${dateTo}&fields=${fields.join(',')}`
-  const r = await fetch(url)
-  if (!r.ok) return []
-  const json = await r.json()
-  return json.data || []
-}
-
-function agregarPorDia(rows: any[], valueKeys: string[]) {
-  const map: Record<string, any> = {}
-  for (const r of rows) {
-    const d = r.date
-    if (!map[d]) { map[d] = { date: d }; valueKeys.forEach(k => (map[d][k] = 0)) }
-    valueKeys.forEach(k => (map[d][k] += parseFloat(r[k]) || 0))
-  }
-  return Object.values(map).sort((a: any, b: any) => a.date.localeCompare(b.date))
-}
-
-// Windsor não documenta um nome único de campo pra "grupo de anúncio" por canal —
-// tentamos os candidatos mais comuns e usamos o primeiro que vier populado.
-function normAdGroup(r: any): string | null {
-  return r.ad_group || r.adgroup_name || r.ad_group_name || r.adset_name || r.adset || null
-}
-
-function agregarPorCampanha(rows: any[], valueKeys: string[]) {
-  const map: Record<string, any> = {}
-  for (const r of rows) {
-    const k = r.campaign_name || 'Sem nome'
-    if (!map[k]) { map[k] = { campaign_name: k, adGroups: {} }; valueKeys.forEach(vk => (map[k][vk] = 0)) }
-    valueKeys.forEach(vk => (map[k][vk] += parseFloat(r[vk]) || 0))
-
-    const ag = normAdGroup(r)
-    if (ag) {
-      if (!map[k].adGroups[ag]) { map[k].adGroups[ag] = { name: ag }; valueKeys.forEach(vk => (map[k].adGroups[ag][vk] = 0)) }
-      valueKeys.forEach(vk => (map[k].adGroups[ag][vk] += parseFloat(r[vk]) || 0))
-    }
-  }
-  return Object.values(map).map((c: any) => ({ ...c, adGroups: Object.values(c.adGroups).sort((a: any, b: any) => b.spend - a.spend) }))
-}
-
-function metaActionValue(actions: any, type: string) {
-  if (!actions || !Array.isArray(actions)) return 0
-  const a = actions.find((x: any) => x.action_type === type)
-  return a ? parseFloat(a.value) || 0 : 0
-}
 
 // Casa o utm_source de um lead com o canal de mídia paga correspondente — string matching
 // simples e explícito (não é atribuição multi-touch, é só pra montar a tabela comparativa).
@@ -176,43 +115,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const from = (date_from as string) || new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)
   const to = (date_to as string) || new Date().toISOString().slice(0, 10)
 
-  const googleFields = ['date', 'campaign_name', 'account_id', 'spend', 'impressions', 'clicks', 'ctr', 'conversions', 'conversion_value', 'search_impression_share', 'search_top_impression_share', 'search_rank_lost_impression_share', 'average_cpm', 'ad_group', 'adgroup_name', 'ad_group_name']
-  const metaFields = ['date', 'campaign_name', 'account_id', 'spend', 'impressions', 'clicks', 'reach', 'frequency', 'actions', 'action_values', 'adset_name', 'adset']
-
-  async function buildGoogle(f: string, t: string) {
-    if (!cliente.windsor_account_id_google) return null
-    const raw = filtrarCampanhas(filtrarPorConta(await fetchWindsor('google_ads', googleFields, f, t), cliente.windsor_account_id_google), cliente.campaign_filter)
-    const daily = agregarPorDia(raw, ['spend', 'impressions', 'clicks', 'conversions', 'conversion_value'])
-    const campaigns = agregarPorCampanha(raw, ['spend', 'impressions', 'clicks', 'conversions', 'conversion_value']).sort((a: any, b: any) => b.spend - a.spend)
-    const totals = daily.reduce((acc: any, d: any) => {
-      acc.spend += d.spend; acc.impressions += d.impressions; acc.clicks += d.clicks; acc.conversions += d.conversions; acc.conversion_value += d.conversion_value
-      return acc
-    }, { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversion_value: 0 })
-    const impShare = raw.length ? raw.reduce((s: number, r: any) => s + (parseFloat(r.search_impression_share) || 0), 0) / raw.length : 0
-    const lostRank = raw.length ? raw.reduce((s: number, r: any) => s + (parseFloat(r.search_rank_lost_impression_share) || 0), 0) / raw.length : 0
-    return { status: raw.length ? 'ativo' : 'sem_entrega', totals, daily, campaigns, auction: { impression_share: impShare, lost_rank: lostRank } }
-  }
-
-  async function buildMeta(f: string, t: string) {
-    if (!cliente.windsor_account_id_meta) return null
-    const raw = filtrarCampanhas(filtrarPorConta(await fetchWindsor('facebook', metaFields, f, t), cliente.windsor_account_id_meta), cliente.meta_campaign_filter || cliente.campaign_filter)
-    const actionType = cliente.tipo === 'is' ? 'lead' : 'purchase'
-    const withDerived = raw.map((r: any) => ({ ...r, conversions: metaActionValue(r.actions, actionType), conversion_value: metaActionValue(r.action_values, 'purchase') }))
-    const daily = agregarPorDia(withDerived, ['spend', 'impressions', 'clicks', 'conversions', 'conversion_value'])
-    const campaigns = agregarPorCampanha(withDerived, ['spend', 'impressions', 'clicks', 'conversions', 'conversion_value']).sort((a: any, b: any) => b.spend - a.spend)
-    const totals = daily.reduce((acc: any, d: any) => {
-      acc.spend += d.spend; acc.impressions += d.impressions; acc.clicks += d.clicks; acc.conversions += d.conversions; acc.conversion_value += d.conversion_value
-      return acc
-    }, { spend: 0, impressions: 0, clicks: 0, conversions: 0, conversion_value: 0 })
-    return { status: raw.length ? 'ativo' : 'sem_entrega', totals, daily, campaigns }
-  }
-
   try {
     const [google, meta, googleCmp, metaCmp] = await Promise.all([
-      buildGoogle(from, to),
-      buildMeta(from, to),
-      compare_from && compare_to ? buildGoogle(compare_from as string, compare_to as string) : Promise.resolve(null),
-      compare_from && compare_to ? buildMeta(compare_from as string, compare_to as string) : Promise.resolve(null),
+      buildGoogle(cliente, from, to),
+      buildMeta(cliente, from, to),
+      compare_from && compare_to ? buildGoogle(cliente, compare_from as string, compare_to as string) : Promise.resolve(null),
+      compare_from && compare_to ? buildMeta(cliente, compare_from as string, compare_to as string) : Promise.resolve(null),
     ])
 
     const cost = (google?.totals.spend || 0) + (meta?.totals.spend || 0)

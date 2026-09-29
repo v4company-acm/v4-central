@@ -39,6 +39,61 @@ function KpiCard({ label, value, sub, color, grad }: { label: string; value: str
   )
 }
 
+const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
+  critico: { label: 'Crítico', bg: C.redLight, color: C.red },
+  atencao: { label: 'Atenção', bg: C.amberBg, color: C.amber },
+  saudavel: { label: 'Saudável', bg: C.greenBg, color: C.green },
+  sem_entrega: { label: 'Sem entrega', bg: 'var(--hover-bg)', color: C.text3 },
+  sem_dado: { label: 'Sem Windsor', bg: 'var(--hover-bg)', color: C.text3 },
+  erro: { label: 'Erro', bg: C.redLight, color: C.red },
+}
+
+function StatusChip({ status }: { status: string }) {
+  const m = STATUS_META[status] || STATUS_META.sem_dado
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: m.bg, color: m.color, textTransform: 'uppercase', letterSpacing: '.02em', whiteSpace: 'nowrap' }}>{m.label}</span>
+}
+
+// Card de uma conta na Visão Geral — pensado pra escanear rápido (status + CPL +
+// barra de leilão), não pra ler em detalhe; clicar leva pro drill-down que já existe.
+function OverviewCard({ r, selected, onClick }: { r: any; selected: boolean; onClick: () => void }) {
+  const semDado = r.status === 'sem_dado'
+  return (
+    <div onClick={onClick} style={{
+      ...card, padding: 14, cursor: 'pointer', opacity: semDado ? 0.55 : 1,
+      outline: selected ? `2px solid ${C.blue}` : 'none', outlineOffset: -1,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: semDado ? 4 : 10 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{r.nome}</div>
+        <StatusChip status={r.status} />
+      </div>
+      {semDado ? (
+        <div style={{ fontSize: 11, color: C.text3 }}>Sem conta de anúncio conectada ainda</div>
+      ) : r.status === 'erro' ? (
+        <div style={{ fontSize: 11, color: C.red }}>Falha ao buscar dado — {r.erro}</div>
+      ) : r.status === 'sem_entrega' ? (
+        <div style={{ fontSize: 11, color: C.text3 }}>0 impressões no período — verificar conta</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: r.auction ? 10 : 0 }}>
+            <div><div style={{ fontSize: 9, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>Investimento</div><div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>{fmtR(r.spend)}</div></div>
+            <div><div style={{ fontSize: 9, fontWeight: 700, color: C.text3, textTransform: 'uppercase' }}>CPL</div><div style={{ fontSize: 14, fontWeight: 800, color: r.cpl == null ? C.red : C.text }}>{r.cpl != null ? fmtR(r.cpl) : (r.clicks >= 20 ? '0 conv.' : '—')}</div></div>
+          </div>
+          {r.auction && (
+            <div>
+              <div style={{ height: 6, borderRadius: 3, overflow: 'hidden', display: 'flex', background: 'var(--hover-bg)' }}>
+                <div style={{ width: `${r.auction.impression_share}%`, background: C.blue }} />
+                <div style={{ width: `${r.auction.lost_rank}%`, background: C.red }} />
+                <div style={{ width: `${r.auction.lost_budget}%`, background: C.amber }} />
+              </div>
+              <div style={{ fontSize: 9, color: C.text3, marginTop: 4 }}>leilão: {fmtPct(r.auction.impression_share, 0)} ganho</div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function SortableTh({ label, active, dir, onClick }: { label: string; active: boolean; dir: 1 | -1; onClick: () => void }) {
   return (
     <th onClick={onClick} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
@@ -103,12 +158,21 @@ export default function ResultadosPage() {
     setExpandedCampaigns(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next })
   }
 
+  const [overview, setOverview] = useState<any>(null)
+  const [overviewDays, setOverviewDays] = useState(7)
+  const [overviewLoading, setOverviewLoading] = useState(false)
+
   useEffect(() => {
     fetch('/api/resultados-clientes').then(r => r.json()).then(d => {
       setClientes(d.clientes || [])
       if (d.clientes?.length) setClienteId(d.clientes[0].id)
     })
   }, [])
+
+  useEffect(() => {
+    setOverviewLoading(true)
+    fetch(`/api/resultados-overview?days=${overviewDays}`).then(r => r.json()).then(setOverview).finally(() => setOverviewLoading(false))
+  }, [overviewDays])
 
   const load = useCallback(async () => {
     if (!clienteId) return
@@ -189,8 +253,30 @@ export default function ResultadosPage() {
       <Layout title="Resultados">
         <div style={{ maxWidth: 1600, margin: '0 auto' }}>
 
+          {/* VISÃO GERAL — todas as contas de uma vez, pra achar quem precisa de atenção
+              sem abrir cliente por cliente. Clicar num card seleciona ele no detalhe abaixo. */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={secTitle}>
+              <span>Visão Geral{overview && ` · ${overview.resultados.length} contas`}</span>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--hover-bg)', borderRadius: 8, padding: 3 }}>
+                {[7, 30].map(d => (
+                  <button key={d} onClick={() => setOverviewDays(d)} style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: overviewDays === d ? C.card : 'transparent', color: overviewDays === d ? C.text : C.text3, boxShadow: overviewDays === d ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>{d}d</button>
+                ))}
+              </div>
+            </div>
+            {overviewLoading && !overview ? (
+              <div style={{ padding: 30, textAlign: 'center', color: C.text3, fontSize: 12 }}>Carregando visão geral...</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                {(overview?.resultados || []).map((r: any) => (
+                  <OverviewCard key={r.id} r={r} selected={r.id === clienteId} onClick={() => { setClienteId(r.id); document.getElementById('detalhe')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* TOOLBAR */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div id="detalhe" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <select value={clienteId} onChange={e => setClienteId(e.target.value)} style={{ height: 38, minWidth: 220, background: '#f1f1f1', border: 'none', borderRadius: 8, padding: '0 12px', fontSize: 13, fontWeight: 700, outline: 'none', cursor: 'pointer' }}>
               {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}{c.nivel === 'full' ? ' · CRM completo' : ''}</option>)}
             </select>
